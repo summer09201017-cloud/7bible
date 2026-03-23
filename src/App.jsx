@@ -1,6 +1,37 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { fetchBible, VERSIONS } from './api';
 import { bookMap } from './bible_books';
+
+// ─── Per-version text colors ─────────────────────────────────────────────────
+const VERSION_COLORS = {
+  unv: '#1a5276',   // 深藍 — 和合本
+  esv: '#7b241c',   // 深紅 — ESV
+  web: '#1e8449',   // 深綠 — WEB
+  ncv: '#6c3483',   // 紫色 — 新譯本
+  lzz: '#b9770e',   // 金棕 — 呂振中
+  asv: '#2471a3',   // 鋼藍 — ASV
+  kjv: '#a04000',   // 橘棕 — KJV
+};
+
+// ─── Reusable styles ─────────────────────────────────────────────────────────
+const S = {
+  bg: { background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e0f2e1 100%)', minHeight: '100vh' },
+  card: { background: 'linear-gradient(145deg, #ffffff, #f1f8e9)', boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #c8e6c9', borderRadius: '16px' },
+  input: { background: 'linear-gradient(145deg, #ffffff, #f9fff5)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05), 0 1px 0 rgba(255,255,255,0.9)', border: '2px solid #a5d6a7', borderRadius: '12px' },
+  btnSearch: { background: 'linear-gradient(145deg, #43a047, #1b5e20)', boxShadow: '0 4px 8px rgba(27,94,32,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
+  btnCopy: { background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 3px 6px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  btnCopied: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', boxShadow: '0 3px 6px rgba(46,125,50,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  btnLine: { background: 'linear-gradient(145deg, #4caf50, #1b5e20)', boxShadow: '0 3px 6px rgba(27,94,32,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  btnEmail: { background: 'linear-gradient(145deg, #ff9800, #e65100)', boxShadow: '0 3px 6px rgba(230,81,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  btnInstall: { background: 'linear-gradient(145deg, #7c4dff, #4527a0)', boxShadow: '0 4px 8px rgba(69,39,160,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  pillActive: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', color: 'white', border: '1px solid #2e7d32', boxShadow: '0 3px 8px rgba(46,125,50,0.3), inset 0 1px 0 rgba(255,255,255,0.15)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
+  pillInactive: { background: 'linear-gradient(145deg, #ffffff, #f5f5f5)', color: '#666', border: '1px solid #ccc', boxShadow: '0 2px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
+  tableHeader: { background: 'linear-gradient(145deg, #e8f5e9, #c8e6c9)', borderBottom: '1px solid #a5d6a7' },
+  actionBar: { background: 'linear-gradient(to right, #e8f5e9, #f1f8e9)', borderTop: '1px solid #c8e6c9' },
+  resultCard: { background: '#ffffff', boxShadow: '0 6px 20px rgba(76,175,80,0.08)', border: '1px solid #c8e6c9', borderRadius: '16px', overflow: 'hidden' },
+  checkbox: { width: 18, height: 18, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0 },
+  statsBar: { background: 'linear-gradient(135deg, #fff9c4, #f1f8e9)', borderBottom: '1px solid #c8e6c9' },
+};
 
 // ─── Highlight helper ────────────────────────────────────────────────────────
 function HighlightText({ text, keyword }) {
@@ -11,7 +42,7 @@ function HighlightText({ text, keyword }) {
     <span>
       {parts.map((part, i) =>
         part.toLowerCase() === keyword.toLowerCase()
-          ? <mark key={i} className="bg-yellow-200 text-yellow-900 rounded px-0.5">{part}</mark>
+          ? <mark key={i} style={{ background: '#fef08a', color: '#854d0e', borderRadius: 3, padding: '0 2px' }}>{part}</mark>
           : part
       )}
     </span>
@@ -23,70 +54,38 @@ function formatVersesForShare(selectedVerses) {
   if (!selectedVerses || selectedVerses.length === 0) return '';
   return selectedVerses.map(v => `${v.ref}\n${v.text}`).join('\n\n');
 }
-
 function shareToLine(text) {
-  const encoded = encodeURIComponent(text);
-  window.open(`https://social-plugins.line.me/lineit/share?url=&text=${encoded}`, '_blank');
+  window.open(`https://social-plugins.line.me/lineit/share?url=&text=${encodeURIComponent(text)}`, '_blank');
 }
-
 function shareToEmail(text) {
-  const subject = encodeURIComponent('聖經經文分享');
-  const body = encodeURIComponent(text);
-  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent('聖經經文分享')}&body=${encodeURIComponent(text)}`;
 }
-
 async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // Fallback
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    return true;
-  }
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); return true; }
 }
 
 // ─── ActionBar ───────────────────────────────────────────────────────────────
 function ActionBar({ getSelectedText, selectedCount }) {
   const [copied, setCopied] = useState(false);
-
   const handleCopy = async () => {
-    const text = getSelectedText();
-    if (!text) return;
-    await copyToClipboard(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const text = getSelectedText(); if (!text) return;
+    await copyToClipboard(text); setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
-
+  const disabled = selectedCount === 0;
+  const disabledStyle = disabled ? { opacity: 0.4, cursor: 'not-allowed' } : {};
   return (
-    <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-gray-50 border-t border-gray-100 sticky bottom-0 z-10">
-      <span className="text-xs text-gray-500 mr-2">
-        已選 <strong>{selectedCount}</strong> 節
+    <div style={{ ...S.actionBar, padding: '12px 16px', position: 'sticky', bottom: 0, zIndex: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: 12, color: '#555', marginRight: 4 }}>
+        已選 <strong style={{ color: '#2e7d32' }}>{selectedCount}</strong> 節
       </span>
-      <button
-        onClick={handleCopy}
-        disabled={selectedCount === 0}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
+      <button onClick={handleCopy} disabled={disabled} style={{ ...(copied ? S.btnCopied : S.btnCopy), ...disabledStyle, padding: '6px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
         {copied ? '✅ 已複製' : '📋 複製經文'}
       </button>
-      <button
-        onClick={() => shareToLine(getSelectedText())}
-        disabled={selectedCount === 0}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
+      <button onClick={() => shareToLine(getSelectedText())} disabled={disabled} style={{ ...S.btnLine, ...disabledStyle, padding: '6px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
         💬 分享到 Line
       </button>
-      <button
-        onClick={() => shareToEmail(getSelectedText())}
-        disabled={selectedCount === 0}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
+      <button onClick={() => shareToEmail(getSelectedText())} disabled={disabled} style={{ ...S.btnEmail, ...disabledStyle, padding: '6px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
         ✉️ Email 分享
       </button>
     </div>
@@ -96,54 +95,32 @@ function ActionBar({ getSelectedText, selectedCount }) {
 // ─── SearchBar ───────────────────────────────────────────────────────────────
 function SearchBar({ onSearch, isLoading, versions, setVersions }) {
   const [query, setQuery] = useState('John 3:16');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (query.trim()) onSearch(query, versions);
-  };
-
+  const handleSubmit = (e) => { e.preventDefault(); if (query.trim()) onSearch(query, versions); };
   const handleVersionToggle = (vId) => {
-    if (versions.includes(vId)) {
-      if (versions.length > 1) setVersions(versions.filter(v => v !== vId));
-    } else {
-      const newVersions = [...versions, vId];
-      newVersions.sort((a, b) =>
-        VERSIONS.findIndex(v => v.id === a) - VERSIONS.findIndex(v => v.id === b)
-      );
-      setVersions(newVersions);
-    }
+    if (versions.includes(vId)) { if (versions.length > 1) setVersions(versions.filter(v => v !== vId)); }
+    else { const nv = [...versions, vId]; nv.sort((a, b) => VERSIONS.findIndex(v => v.id === a) - VERSIONS.findIndex(v => v.id === b)); setVersions(nv); }
   };
 
   return (
-    <div className="bg-white shadow-md rounded-2xl p-6 mb-6 max-w-4xl mx-auto border border-gray-100">
-      <h1 className="text-2xl font-bold text-gray-800 mb-5 text-center tracking-tight">多譯本聖經查詢</h1>
-      <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 mb-5">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+    <div style={{ ...S.card, padding: 24, marginBottom: 24, maxWidth: 900, marginLeft: 'auto', marginRight: 'auto' }}>
+      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1b5e20', textAlign: 'center', marginBottom: 20, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+        📖 多譯本聖經查詢
+      </h1>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+        <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
           placeholder="書卷章節：創 1、John 3:16　關鍵字：愛心、faith"
-          className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-gray-700"
+          style={{ ...S.input, flex: 1, minWidth: 200, padding: '12px 16px', fontSize: 15, outline: 'none', color: '#333' }}
+          onFocus={(e) => e.target.style.borderColor = '#43a047'}
+          onBlur={(e) => e.target.style.borderColor = '#a5d6a7'}
         />
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
-        >
-          {isLoading ? '查詢中...' : '查詢'}
+        <button type="submit" disabled={isLoading} style={{ ...S.btnSearch, padding: '12px 32px', fontSize: 16 }}>
+          {isLoading ? '⏳ 查詢中...' : '🔍 查詢'}
         </button>
       </form>
-      <div className="flex flex-wrap gap-2 justify-center">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
         {VERSIONS.map(v => (
-          <label
-            key={v.id}
-            className={`cursor-pointer px-4 py-1.5 rounded-full text-sm font-medium transition-all select-none border ${
-              versions.includes(v.id)
-                ? 'bg-blue-100 border-blue-300 text-blue-800'
-                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            <input type="checkbox" className="hidden" checked={versions.includes(v.id)} onChange={() => handleVersionToggle(v.id)} />
+          <label key={v.id} style={versions.includes(v.id) ? { ...S.pillActive, padding: '6px 16px', fontSize: 13 } : { ...S.pillInactive, padding: '6px 16px', fontSize: 13 }}>
+            <input type="checkbox" style={{ display: 'none' }} checked={versions.includes(v.id)} onChange={() => handleVersionToggle(v.id)} />
             {v.label}
           </label>
         ))}
@@ -156,77 +133,48 @@ function SearchBar({ onSearch, isLoading, versions, setVersions }) {
 function VerseViewer({ data }) {
   const { results } = data;
   const [selected, setSelected] = useState(new Set());
-
   const verseNums = new Set();
   results.forEach(res => res.record?.forEach(r => verseNums.add(r.sec)));
   const verses = Array.from(verseNums).sort((a, b) => a - b);
-
   if (verses.length === 0) return <EmptyState text="找不到相關經文" />;
-
   const cols = results.length;
-  const gridClass = cols <= 1 ? 'grid-cols-1' :
-    cols === 2 ? 'md:grid-cols-2' :
-    cols === 3 ? 'md:grid-cols-3' :
-    cols === 4 ? 'md:grid-cols-2 lg:grid-cols-4' :
-    cols <= 6 ? 'md:grid-cols-3 lg:grid-cols-6' :
-    'md:grid-cols-3 lg:grid-cols-7';
-
-  const toggleVerse = (vNum) => {
-    const ns = new Set(selected);
-    ns.has(vNum) ? ns.delete(vNum) : ns.add(vNum);
-    setSelected(ns);
-  };
-
-  const toggleAll = () => {
-    if (selected.size === verses.length) setSelected(new Set());
-    else setSelected(new Set(verses));
-  };
-
+  const toggleVerse = (n) => { const s = new Set(selected); s.has(n) ? s.delete(n) : s.add(n); setSelected(s); };
+  const toggleAll = () => { selected.size === verses.length ? setSelected(new Set()) : setSelected(new Set(verses)); };
   const getSelectedText = () => {
     const lines = [];
     for (const vNum of Array.from(selected).sort((a, b) => a - b)) {
-      results.forEach(res => {
-        const vInfo = VERSIONS.find(v => v.id === res.version);
-        const verseData = res.record?.find(r => r.sec == vNum);
-        if (verseData?.bible_text && verseData.bible_text !== '--') {
-          lines.push({ ref: `[${vInfo?.label}] ${vNum}`, text: verseData.bible_text.replace(/<[^>]+>/g, '') });
-        }
+      results.forEach(res => { const vi = VERSIONS.find(v => v.id === res.version); const vd = res.record?.find(r => r.sec == vNum);
+        if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${vNum}`, text: vd.bible_text.replace(/<[^>]+>/g, '') });
       });
     }
     return formatVersesForShare(lines);
   };
 
   return (
-    <div className="w-full bg-white shadow-sm rounded-2xl border border-gray-100 overflow-hidden">
-      {/* Header with select-all */}
-      <div className={`hidden md:grid gap-4 bg-gray-50 border-b border-gray-100 px-4 py-3 sticky top-0 z-10`} style={{ gridTemplateColumns: `40px repeat(${cols}, 1fr)` }}>
-        <div className="flex items-center justify-center">
-          <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} className="w-4 h-4 accent-blue-600 cursor-pointer" />
+    <div style={S.resultCard}>
+      <div style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} style={S.checkbox} />
         </div>
         {results.map((res, i) => {
-          const vInfo = VERSIONS.find(v => v.id === res.version);
-          return <div key={i} className="font-semibold text-gray-700 text-center text-sm">{vInfo?.label}</div>;
+          const vi = VERSIONS.find(v => v.id === res.version);
+          return <div key={i} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || '#333', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
         })}
       </div>
-      <div className="divide-y divide-gray-100">
+      <div>
         {verses.map(vNum => (
-          <div key={vNum} className={`flex flex-col md:block transition-colors ${selected.has(vNum) ? 'bg-blue-50/40' : 'hover:bg-gray-50/50'}`}>
-            <div className="md:hidden bg-blue-50 px-4 py-2 font-semibold text-blue-800 text-sm flex items-center gap-2">
-              <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} className="w-4 h-4 accent-blue-600" />
-              第 {vNum} 節
-            </div>
-            <div className="grid gap-4 p-4" style={{ gridTemplateColumns: `40px repeat(${cols}, 1fr)` }}>
-              <div className="hidden md:flex items-start justify-center pt-0.5">
-                <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} className="w-4 h-4 accent-blue-600 cursor-pointer" />
+          <div key={vNum} style={{ borderBottom: '1px solid #e8f5e9', background: selected.has(vNum) ? '#e8f5e930' : 'transparent', transition: 'background 0.15s' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
+                <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} style={S.checkbox} />
               </div>
               {results.map((res, i) => {
-                const verseData = res.record?.find(r => r.sec == vNum);
-                const text = verseData?.bible_text || '--';
-                const vInfo = VERSIONS.find(v => v.id === res.version);
+                const vd = res.record?.find(r => r.sec == vNum);
+                const text = vd?.bible_text || '--';
+                const vi = VERSIONS.find(v => v.id === res.version);
                 return (
-                  <div key={i} className="text-gray-800 leading-relaxed text-[15px]">
-                    <div className="md:hidden text-xs text-gray-400 mb-1 border-b pb-1 font-medium">{vInfo?.label}</div>
-                    <span className="hidden md:inline text-blue-400 text-xs font-bold mr-1.5 align-top">{vNum}</span>
+                  <div key={i} style={{ color: VERSION_COLORS[res.version] || '#333', lineHeight: 1.7, fontSize: 15 }}>
+                    <span style={{ color: VERSION_COLORS[res.version] || '#666', fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top' }}>{vNum}</span>
                     <span dangerouslySetInnerHTML={{ __html: text.replace(/<[^>]+>/g, '') }} />
                   </div>
                 );
@@ -244,123 +192,72 @@ function VerseViewer({ data }) {
 function KeywordViewer({ data }) {
   const { results, keyword } = data;
   const [selected, setSelected] = useState(new Set());
-
   const verseMap = new Map();
-  results.forEach(res => {
-    res.record?.forEach(r => {
-      const key = `${r.chineses}-${r.chap}-${r.sec}`;
-      if (!verseMap.has(key)) {
-        const bookIndex = bookMap.findIndex(b => b.names[0] === r.chineses || b.names.includes(r.chineses));
-        verseMap.set(key, { key, chineses: r.chineses, chap: r.chap, sec: r.sec, bookIndex: bookIndex >= 0 ? bookIndex : 999 });
-      }
-    });
-  });
-  const verses = Array.from(verseMap.values()).sort((a, b) => {
-    if (a.bookIndex !== b.bookIndex) return a.bookIndex - b.bookIndex;
-    if (a.chap !== b.chap) return a.chap - b.chap;
-    return a.sec - b.sec;
-  });
-
+  results.forEach(res => { res.record?.forEach(r => {
+    const key = `${r.chineses}-${r.chap}-${r.sec}`;
+    if (!verseMap.has(key)) { const bi = bookMap.findIndex(b => b.names[0] === r.chineses || b.names.includes(r.chineses));
+      verseMap.set(key, { key, chineses: r.chineses, chap: r.chap, sec: r.sec, bookIndex: bi >= 0 ? bi : 999 }); }
+  }); });
+  const verses = Array.from(verseMap.values()).sort((a, b) => a.bookIndex !== b.bookIndex ? a.bookIndex - b.bookIndex : a.chap !== b.chap ? a.chap - b.chap : a.sec - b.sec);
   if (verses.length === 0) return <EmptyState text={`找不到含有「${keyword}」的經文`} />;
-
   const totalCount = results.reduce((s, r) => s + (r.record?.length || 0), 0);
   const cols = results.length;
-  const gridClass = cols <= 1 ? 'grid-cols-1' :
-    cols === 2 ? 'md:grid-cols-2' :
-    cols === 3 ? 'md:grid-cols-3' :
-    cols === 4 ? 'md:grid-cols-2 lg:grid-cols-4' :
-    cols <= 6 ? 'md:grid-cols-3 lg:grid-cols-6' :
-    'md:grid-cols-3 lg:grid-cols-7';
-
-  const toggleVerse = (key) => {
-    const ns = new Set(selected);
-    ns.has(key) ? ns.delete(key) : ns.add(key);
-    setSelected(ns);
-  };
-
-  const toggleAll = () => {
-    if (selected.size === verses.length) setSelected(new Set());
-    else setSelected(new Set(verses.map(v => v.key)));
-  };
-
+  const toggleVerse = (key) => { const s = new Set(selected); s.has(key) ? s.delete(key) : s.add(key); setSelected(s); };
+  const toggleAll = () => { selected.size === verses.length ? setSelected(new Set()) : setSelected(new Set(verses.map(v => v.key))); };
   const getSelectedText = () => {
     const lines = [];
-    for (const verseObj of verses) {
-      if (!selected.has(verseObj.key)) continue;
-      results.forEach(res => {
-        const vInfo = VERSIONS.find(v => v.id === res.version);
-        const verseData = res.record?.find(r =>
-          r.chineses === verseObj.chineses && r.chap === verseObj.chap && r.sec === verseObj.sec
-        );
-        if (verseData?.bible_text && verseData.bible_text !== '--') {
-          lines.push({
-            ref: `[${vInfo?.label}] ${verseObj.chineses} ${verseObj.chap}:${verseObj.sec}`,
-            text: verseData.bible_text.replace(/<[^>]+>/g, ''),
-          });
-        }
+    for (const vo of verses) { if (!selected.has(vo.key)) continue;
+      results.forEach(res => { const vi = VERSIONS.find(v => v.id === res.version);
+        const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
+        if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${vo.chineses} ${vo.chap}:${vo.sec}`, text: vd.bible_text.replace(/<[^>]+>/g, '') });
       });
     }
     return formatVersesForShare(lines);
   };
 
   return (
-    <div className="w-full bg-white shadow-sm rounded-2xl border border-gray-100 overflow-hidden">
-      {/* Stats bar */}
-      <div className="flex flex-wrap items-center gap-4 px-4 py-3 bg-amber-50 border-b border-amber-100">
-        <span className="text-amber-800 text-sm font-medium">
-          🔍 關鍵字：<strong>「{keyword}」</strong>
-        </span>
-        <span className="text-amber-700 text-sm">共找到約 <strong>{totalCount}</strong> 筆結果（{verses.length} 節）</span>
-        <div className="flex flex-wrap gap-2 ml-auto">
+    <div style={S.resultCard}>
+      {/* Stats */}
+      <div style={{ ...S.statsBar, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 16px' }}>
+        <span style={{ color: '#b45309', fontSize: 14, fontWeight: 600 }}>🔍 關鍵字：<strong>「{keyword}」</strong></span>
+        <span style={{ color: '#92400e', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆（{verses.length} 節）</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginLeft: 'auto' }}>
           {results.map(r => {
-            const vInfo = VERSIONS.find(v => v.id === r.version);
-            return (
-              <span key={r.version} className="text-xs bg-white border border-amber-200 text-amber-700 rounded-full px-2 py-0.5">
-                {vInfo?.label}: {r.record?.length ?? 0} 筆
-              </span>
-            );
+            const vi = VERSIONS.find(v => v.id === r.version);
+            return <span key={r.version} style={{ fontSize: 11, border: '1px solid #fde68a', color: VERSION_COLORS[r.version] || '#92400e', borderRadius: 999, padding: '2px 8px', fontWeight: 600, background: 'linear-gradient(145deg, #fffde7, #fff9c4)' }}>
+              {vi?.label}: {r.record?.length ?? 0}
+            </span>;
           })}
         </div>
       </div>
-
-      {/* Column headers with select-all */}
-      <div className={`hidden md:grid gap-4 bg-gray-50 border-b border-gray-100 px-4 py-3 sticky top-0 z-10`} style={{ gridTemplateColumns: `40px repeat(${cols}, 1fr)` }}>
-        <div className="flex items-center justify-center">
-          <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} className="w-4 h-4 accent-blue-600 cursor-pointer" />
+      {/* Headers */}
+      <div style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} style={S.checkbox} />
         </div>
         {results.map((res, i) => {
-          const vInfo = VERSIONS.find(v => v.id === res.version);
-          return <div key={i} className="font-semibold text-gray-700 text-center text-sm">{vInfo?.label}</div>;
+          const vi = VERSIONS.find(v => v.id === res.version);
+          return <div key={i} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || '#333', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
         })}
       </div>
-
       {/* Rows */}
-      <div className="divide-y divide-gray-100">
-        {verses.map(verseObj => (
-          <div key={verseObj.key} className={`flex flex-col md:block transition-colors ${selected.has(verseObj.key) ? 'bg-yellow-50/60' : 'hover:bg-yellow-50/30'}`}>
-            <div className="md:hidden bg-blue-50 px-4 py-1.5 font-semibold text-blue-800 text-sm flex items-center gap-2">
-              <input type="checkbox" checked={selected.has(verseObj.key)} onChange={() => toggleVerse(verseObj.key)} className="w-4 h-4 accent-blue-600" />
-              {verseObj.chineses} {verseObj.chap}:{verseObj.sec}
-            </div>
-            <div className="grid gap-4 p-4" style={{ gridTemplateColumns: `40px repeat(${cols}, 1fr)` }}>
-              <div className="hidden md:flex items-start justify-center pt-0.5">
-                <input type="checkbox" checked={selected.has(verseObj.key)} onChange={() => toggleVerse(verseObj.key)} className="w-4 h-4 accent-blue-600 cursor-pointer" />
+      <div>
+        {verses.map(vo => (
+          <div key={vo.key} style={{ borderBottom: '1px solid #e8f5e9', background: selected.has(vo.key) ? '#fef9c340' : 'transparent', transition: 'background 0.15s' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
+                <input type="checkbox" checked={selected.has(vo.key)} onChange={() => toggleVerse(vo.key)} style={S.checkbox} />
               </div>
               {results.map((res, i) => {
-                const verseData = res.record?.find(r =>
-                  r.chineses === verseObj.chineses && r.chap === verseObj.chap && r.sec === verseObj.sec
-                );
-                const vInfo = VERSIONS.find(v => v.id === res.version);
+                const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
+                const vi = VERSIONS.find(v => v.id === res.version);
+                const col = VERSION_COLORS[res.version] || '#333';
                 return (
-                  <div key={i} className="text-gray-800 leading-relaxed text-[15px]">
-                    <div className="md:hidden text-xs text-gray-400 mb-1 border-b pb-1 font-medium">{vInfo?.label}</div>
-                    <span className="hidden md:inline text-blue-400 text-xs font-bold mr-1.5 align-top">
-                      {verseObj.chineses} {verseObj.chap}:{verseObj.sec}
+                  <div key={i} style={{ color: col, lineHeight: 1.7, fontSize: 15 }}>
+                    <span style={{ color: col, fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.7 }}>
+                      {vo.chineses} {vo.chap}:{vo.sec}
                     </span>
-                    {verseData
-                      ? <HighlightText text={verseData.bible_text.replace(/<[^>]+>/g, '')} keyword={keyword} />
-                      : <span className="text-gray-300">--</span>
-                    }
+                    {vd ? <HighlightText text={vd.bible_text.replace(/<[^>]+>/g, '')} keyword={keyword} /> : <span style={{ color: '#ccc' }}>--</span>}
                   </div>
                 );
               })}
@@ -375,64 +272,27 @@ function KeywordViewer({ data }) {
 
 // ─── Shared empty state ──────────────────────────────────────────────────────
 function EmptyState({ text }) {
-  return (
-    <div className="text-center text-gray-400 py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
-      {text}
-    </div>
-  );
+  return <div style={{ textAlign: 'center', color: '#999', padding: '48px 0', ...S.resultCard }}>{text}</div>;
 }
 
 // ─── Install PWA Button ──────────────────────────────────────────────────────
 function InstallButton() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installed, setInstalled] = useState(false);
-
   useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
+    const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
-
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setInstalled(true);
-    }
+    if (window.matchMedia('(display-mode: standalone)').matches) setInstalled(true);
     window.addEventListener('appinstalled', () => setInstalled(true));
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
-
   const handleInstall = async () => {
-    if (!deferredPrompt) {
-      // Fallback: show instructions
-      alert('📲 安裝方式：\n\n• iPhone Safari：點選底部「分享」→「加入主畫面」\n• Android Chrome：點選右上「⋮」→「安裝應用程式」\n• 電腦 Chrome：網址列右邊的安裝圖示');
-      return;
-    }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setInstalled(true);
-    setDeferredPrompt(null);
+    if (!deferredPrompt) { alert('📲 安裝方式：\n\n• iPhone Safari：點選底部「分享」→「加入主畫面」\n• Android Chrome：點選右上「⋮」→「安裝應用程式」\n• 電腦 Chrome：網址列右邊的安裝圖示'); return; }
+    deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') setInstalled(true); setDeferredPrompt(null);
   };
-
-  if (installed) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
-        ✅ 已安裝
-      </span>
-    );
-  }
-
-  return (
-    <button
-      onClick={handleInstall}
-      className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
-    >
-      📲 安裝 App
-    </button>
-  );
+  if (installed) return <span style={{ fontSize: 12, color: '#2e7d32', padding: '6px 14px', borderRadius: 999, border: '1px solid #a5d6a7', background: 'linear-gradient(145deg, #e8f5e9, #c8e6c9)', fontWeight: 600 }}>✅ 已安裝</span>;
+  return <button onClick={handleInstall} style={{ ...S.btnInstall, padding: '10px 22px', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>📲 安裝 App</button>;
 }
 
 // ─── App root ────────────────────────────────────────────────────────────────
@@ -443,45 +303,24 @@ export default function App() {
   const [versions, setVersions] = useState(['unv', 'esv', 'web', 'ncv', 'lzz', 'asv', 'kjv']);
 
   const handleSearch = useCallback(async (query, selectedVersions) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetchBible(query, selectedVersions);
-      setData(res);
-    } catch (err) {
-      setError(err.message);
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setError(null);
+    try { const res = await fetchBible(query, selectedVersions); setData(res); }
+    catch (err) { setError(err.message); setData(null); }
+    finally { setLoading(false); }
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] py-8 px-4 sm:px-6 lg:px-8 font-sans selection:bg-blue-100">
-      <div className="max-w-[1600px] mx-auto">
+    <div style={{ ...S.bg, padding: '32px 16px', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+      <div style={{ maxWidth: 1600, margin: '0 auto' }}>
         <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} />
-
-        {/* Install button row */}
-        <div className="flex justify-center mb-6">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
           <InstallButton />
         </div>
-
-        {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 text-center max-w-4xl mx-auto border border-red-100 text-sm">
-            ⚠️ {error}
-          </div>
-        )}
-
-        {loading && (
-          <div className="text-center text-gray-400 py-16 animate-pulse">
-            搜尋中，請稍候…
-          </div>
-        )}
-
+        {error && <div style={{ background: 'linear-gradient(145deg, #ffebee, #ffcdd2)', border: '1px solid #ef9a9a', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: '#c62828' }}>⚠️ {error}</div>}
+        {loading && <div style={{ textAlign: 'center', color: '#2e7d32', padding: '64px 0', fontSize: 18, fontWeight: 600 }}>⏳ 搜尋中，請稍候…</div>}
         {!loading && data && data.mode === 'verse' && <VerseViewer data={data} />}
         {!loading && data && data.mode === 'keyword' && <KeywordViewer data={data} />}
-
-        <footer className="mt-12 text-center text-gray-400 text-xs pb-8">
+        <footer style={{ marginTop: 48, textAlign: 'center', color: '#81c784', fontSize: 12, paddingBottom: 32 }}>
           資料來源：信望愛 (FHL) 聖經 ・ 本機 JSON ・ 7 種譯本離線可用
         </footer>
       </div>
