@@ -34,8 +34,19 @@ function getVersesFromLocal(data, abbrev, chap, sec) {
   const chapter = book.chapters[chapIndex];
   if (!chapter) return [];
   if (sec) {
-    const text = chapter[parseInt(sec) - 1];
-    return text ? [{ sec: parseInt(sec), bible_text: text }] : [];
+    if (sec.includes('-')) {
+      const [start, end] = sec.split('-').map(Number);
+      const startIdx = Math.max(0, start - 1);
+      const endIdx = Math.min(chapter.length - 1, end - 1);
+      const results = [];
+      for (let i = startIdx; i <= endIdx; i++) {
+        if (chapter[i]) results.push({ sec: i + 1, bible_text: chapter[i] });
+      }
+      return results;
+    } else {
+      const text = chapter[parseInt(sec) - 1];
+      return text ? [{ sec: parseInt(sec), bible_text: text }] : [];
+    }
   }
   return chapter.map((text, i) => ({ sec: i + 1, bible_text: text || '' }));
 }
@@ -109,14 +120,17 @@ export async function fetchBible(query, versions) {
   const trimmedQuery = query.trim();
 
   // Detect if it's a chapter/verse reference or keyword search
-  const refRegex = /^([a-zA-Z\s\u4e00-\u9fa5]+?)\s*(\d+)(?:[:：](\d+))?$/;
+  const refRegex = /^([a-zA-Z\s\u4e00-\u9fa5]+?)\s*(\d+)(?:[:：](\d+)(?:[-～~](\d+))?)?$/;
   const match = trimmedQuery.match(refRegex);
 
   // ── Mode 1: Chapter/Verse reference ──
   if (match) {
     const rawBook = match[1].trim();
     const chap = match[2];
-    const sec = match[3] || '';
+    const secStart = match[3] || '';
+    const secEnd = match[4] || '';
+    const sec = secEnd ? `${secStart}-${secEnd}` : secStart;
+    
     const abbrev = findLocalAbbrev(rawBook);
     if (!abbrev) throw new Error(`找不到書卷：${rawBook}`);
     const promises = versions.map(v => fetchLocalVersion(v, abbrev, chap, sec));

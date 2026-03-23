@@ -99,6 +99,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
   const [selBook, setSelBook] = useState('');
   const [selChap, setSelChap] = useState('');
   const [selVerse, setSelVerse] = useState('');
+  const [selEndVerse, setSelEndVerse] = useState('');
 
   useEffect(() => {
     if (selBook) {
@@ -107,11 +108,16 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
       let q = bName;
       if (selChap) {
         q += ` ${selChap}`;
-        if (selVerse) q += `:${selVerse}`;
+        if (selVerse) {
+          q += `:${selVerse}`;
+          if (selEndVerse) {
+            q += `-${selEndVerse}`;
+          }
+        }
       }
       setQuery(q);
     }
-  }, [selBook, selChap, selVerse]);
+  }, [selBook, selChap, selVerse, selEndVerse]);
 
   const handleSubmit = (e) => { e.preventDefault(); if (query.trim()) onSearch(query, versions); };
   const handleVersionToggle = (vId) => {
@@ -139,7 +145,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
 
       {/* Book / Chapter / Verse Selectors */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); }} style={S.select}>
+        <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }} style={S.select}>
           <option value="">📖 選擇書卷</option>
           {bibleStructure && bibleStructure.map(b => {
              const bInfo = bookMap.find(bm => bm.localAbbrev === b.abbrev);
@@ -147,27 +153,35 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
           })}
         </select>
         
-        <select value={selChap} onChange={(e) => { setSelChap(e.target.value); setSelVerse(''); }} disabled={!selBook} style={{ ...S.select, opacity: selBook ? 1 : 0.5 }}>
+        <select value={selChap} onChange={(e) => { setSelChap(e.target.value); setSelVerse(''); setSelEndVerse(''); }} disabled={!selBook} style={{ ...S.select, opacity: selBook ? 1 : 0.5 }}>
           <option value="">🔖 選擇章</option>
           {chaptersCount > 0 && Array.from({ length: chaptersCount }, (_, i) => (
             <option key={i + 1} value={i + 1}>第 {i + 1} 章</option>
           ))}
         </select>
 
-        <select value={selVerse} onChange={(e) => setSelVerse(e.target.value)} disabled={!selChap} style={{ ...S.select, opacity: selChap ? 1 : 0.5 }}>
-          <option value="">📍 選擇節 (選填)</option>
+        <select value={selVerse} onChange={(e) => { setSelVerse(e.target.value); setSelEndVerse(''); }} disabled={!selChap} style={{ ...S.select, opacity: selChap ? 1 : 0.5 }}>
+          <option value="">📍 起始節 (選填)</option>
           {versesCount > 0 && Array.from({ length: versesCount }, (_, i) => (
             <option key={i + 1} value={i + 1}>第 {i + 1} 節</option>
           ))}
+        </select>
+
+        <select value={selEndVerse} onChange={(e) => setSelEndVerse(e.target.value)} disabled={!selVerse} style={{ ...S.select, opacity: selVerse ? 1 : 0.5 }}>
+          <option value="">🏁 結束節 (單節留空)</option>
+          {versesCount > 0 && selVerse && Array.from({ length: versesCount - parseInt(selVerse) }, (_, i) => {
+            const verseNum = parseInt(selVerse) + i + 1;
+            return <option key={verseNum} value={verseNum}>至 {verseNum} 節</option>;
+          })}
         </select>
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <input type="text" value={query} onChange={(e) => {
           setQuery(e.target.value);
-          if (selBook) { setSelBook(''); setSelChap(''); setSelVerse(''); }
+          if (selBook) { setSelBook(''); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }
         }}
-          placeholder="書卷章節：創 1、John 3:16　關鍵字：愛心、faith"
+          placeholder="書卷章節：創 1、John 3:16-18　關鍵字：愛心、faith"
           style={{ ...S.input, flex: 1, minWidth: 200, padding: '12px 16px', fontSize: 15, outline: 'none', color: '#333' }}
           onFocus={(e) => e.target.style.borderColor = '#43a047'}
           onBlur={(e) => e.target.style.borderColor = '#a5d6a7'}
