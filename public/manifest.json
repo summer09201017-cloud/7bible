@@ -1,0 +1,24 @@
+{
+  "name": "多譯本聖經查詢",
+  "short_name": "聖經查詢",
+  "description": "多譯本聖經查詢工具，支援和合本、ESV、呂振中、新譯本、ASV、KJV、WEB 並行對照",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
