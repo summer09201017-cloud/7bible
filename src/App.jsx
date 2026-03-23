@@ -31,6 +31,7 @@ const S = {
   resultCard: { background: '#ffffff', boxShadow: '0 6px 20px rgba(76,175,80,0.08)', border: '1px solid #c8e6c9', borderRadius: '16px', overflow: 'hidden' },
   checkbox: { width: 18, height: 18, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0 },
   statsBar: { background: 'linear-gradient(135deg, #fff9c4, #f1f8e9)', borderBottom: '1px solid #c8e6c9' },
+  select: { background: 'linear-gradient(145deg, #ffffff, #f9fff5)', border: '2px solid #a5d6a7', borderRadius: '10px', padding: '10px 14px', fontSize: 14, outline: 'none', color: '#1b5e20', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 120 },
 };
 
 // ─── Highlight helper ────────────────────────────────────────────────────────
@@ -93,21 +94,79 @@ function ActionBar({ getSelectedText, selectedCount }) {
 }
 
 // ─── SearchBar ───────────────────────────────────────────────────────────────
-function SearchBar({ onSearch, isLoading, versions, setVersions }) {
+function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure }) {
   const [query, setQuery] = useState('John 3:16');
+  const [selBook, setSelBook] = useState('');
+  const [selChap, setSelChap] = useState('');
+  const [selVerse, setSelVerse] = useState('');
+
+  useEffect(() => {
+    if (selBook) {
+      const bInfo = bookMap.find(b => b.localAbbrev === selBook);
+      const bName = bInfo ? bInfo.names[0] : selBook;
+      let q = bName;
+      if (selChap) {
+        q += ` ${selChap}`;
+        if (selVerse) q += `:${selVerse}`;
+      }
+      setQuery(q);
+    }
+  }, [selBook, selChap, selVerse]);
+
   const handleSubmit = (e) => { e.preventDefault(); if (query.trim()) onSearch(query, versions); };
   const handleVersionToggle = (vId) => {
     if (versions.includes(vId)) { if (versions.length > 1) setVersions(versions.filter(v => v !== vId)); }
     else { const nv = [...versions, vId]; nv.sort((a, b) => VERSIONS.findIndex(v => v.id === a) - VERSIONS.findIndex(v => v.id === b)); setVersions(nv); }
   };
 
+  let chaptersCount = 0;
+  let versesCount = 0;
+  if (bibleStructure && selBook) {
+    const bookData = bibleStructure.find(b => b.abbrev === selBook);
+    if (bookData) {
+      chaptersCount = bookData.chapters.length;
+      if (selChap && parseInt(selChap) <= chaptersCount) {
+        versesCount = bookData.chapters[parseInt(selChap) - 1].length;
+      }
+    }
+  }
+
   return (
     <div style={{ ...S.card, padding: 24, marginBottom: 24, maxWidth: 900, marginLeft: 'auto', marginRight: 'auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1b5e20', textAlign: 'center', marginBottom: 20, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
         📖 多譯本聖經查詢
       </h1>
+
+      {/* Book / Chapter / Verse Selectors */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+        <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); }} style={S.select}>
+          <option value="">📖 選擇書卷</option>
+          {bibleStructure && bibleStructure.map(b => {
+             const bInfo = bookMap.find(bm => bm.localAbbrev === b.abbrev);
+             return <option key={b.abbrev} value={b.abbrev}>{bInfo ? bInfo.names[1] : b.name}</option>;
+          })}
+        </select>
+        
+        <select value={selChap} onChange={(e) => { setSelChap(e.target.value); setSelVerse(''); }} disabled={!selBook} style={{ ...S.select, opacity: selBook ? 1 : 0.5 }}>
+          <option value="">🔖 選擇章</option>
+          {chaptersCount > 0 && Array.from({ length: chaptersCount }, (_, i) => (
+            <option key={i + 1} value={i + 1}>第 {i + 1} 章</option>
+          ))}
+        </select>
+
+        <select value={selVerse} onChange={(e) => setSelVerse(e.target.value)} disabled={!selChap} style={{ ...S.select, opacity: selChap ? 1 : 0.5 }}>
+          <option value="">📍 選擇節 (選填)</option>
+          {versesCount > 0 && Array.from({ length: versesCount }, (_, i) => (
+            <option key={i + 1} value={i + 1}>第 {i + 1} 節</option>
+          ))}
+        </select>
+      </div>
+
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+        <input type="text" value={query} onChange={(e) => {
+          setQuery(e.target.value);
+          if (selBook) { setSelBook(''); setSelChap(''); setSelVerse(''); }
+        }}
           placeholder="書卷章節：創 1、John 3:16　關鍵字：愛心、faith"
           style={{ ...S.input, flex: 1, minWidth: 200, padding: '12px 16px', fontSize: 15, outline: 'none', color: '#333' }}
           onFocus={(e) => e.target.style.borderColor = '#43a047'}
@@ -301,6 +360,14 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [versions, setVersions] = useState(['unv', 'esv', 'web', 'ncv', 'lzz', 'asv', 'kjv']);
+  const [bibleStructure, setBibleStructure] = useState(null);
+
+  useEffect(() => {
+    fetch('/data/unv.json')
+      .then(r => r.json())
+      .then(data => setBibleStructure(data))
+      .catch(err => console.error("Error loading bible structure:", err));
+  }, []);
 
   const handleSearch = useCallback(async (query, selectedVersions) => {
     setLoading(true); setError(null);
@@ -312,7 +379,7 @@ export default function App() {
   return (
     <div style={{ ...S.bg, padding: '32px 16px', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1600, margin: '0 auto' }}>
-        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} />
+        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} />
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
           <InstallButton />
         </div>
