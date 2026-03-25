@@ -94,3 +94,47 @@ input[type="checkbox"]:checked::after {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #a5d6a7; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #66bb6a; }
+
+/* ─── Responsive Grid for Mobile ─── */
+.mobile-verse-label { display: none; }
+.mobile-version-name { display: none; }
+
+@media (max-width: 768px) {
+  .responsive-header { display: none !important; }
+  .responsive-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+    padding: 16px !important;
+  }
+  .responsive-checkbox-wrapper {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding: 10px 14px !important;
+    background: linear-gradient(to right, #e8f5e9, #f9fff5) !important;
+    border-radius: 10px !important;
+    border: 1px solid #c8e6c9 !important;
+    margin-bottom: 8px !important;
+  }
+  .mobile-verse-label {
+    display: inline-block !important;
+    margin-left: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1b5e20;
+  }
+  .desktop-verse-num { display: none !important; }
+  .mobile-version-name {
+    display: block !important;
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    border-bottom: 1px dashed #a5d6a7;
+    padding-bottom: 4px;
+  }
+  .verse-text-content {
+    padding-left: 8px !important;
+  }
+}
+

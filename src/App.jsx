@@ -225,7 +225,7 @@ function VerseViewer({ data }) {
 
   return (
     <div style={S.resultCard}>
-      <div style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} style={S.checkbox} />
         </div>
@@ -237,17 +237,20 @@ function VerseViewer({ data }) {
       <div>
         {verses.map(vNum => (
           <div key={vNum} style={{ borderBottom: '1px solid #e8f5e9', background: selected.has(vNum) ? '#e8f5e930' : 'transparent', transition: 'background 0.15s' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
+            <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
+              <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
                 <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} style={S.checkbox} />
+                <span className="mobile-verse-label">第 {vNum} 節</span>
               </div>
               {results.map((res, i) => {
                 const vd = res.record?.find(r => r.sec == vNum);
                 const text = vd?.bible_text || '--';
                 const vi = VERSIONS.find(v => v.id === res.version);
+                const col = VERSION_COLORS[res.version] || '#333';
                 return (
-                  <div key={i} style={{ color: VERSION_COLORS[res.version] || '#333', lineHeight: 1.7, fontSize: 15 }}>
-                    <span style={{ color: VERSION_COLORS[res.version] || '#666', fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top' }}>{vNum}</span>
+                  <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: 15 }}>
+                     <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
+                    <span className="desktop-verse-num" style={{ color: col, fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top' }}>{vNum}</span>
                     <span dangerouslySetInnerHTML={{ __html: text.replace(/<[^>]+>/g, '') }} />
                   </div>
                 );
@@ -304,7 +307,7 @@ function KeywordViewer({ data }) {
         </div>
       </div>
       {/* Headers */}
-      <div style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} style={S.checkbox} />
         </div>
@@ -317,17 +320,19 @@ function KeywordViewer({ data }) {
       <div>
         {verses.map(vo => (
           <div key={vo.key} style={{ borderBottom: '1px solid #e8f5e9', background: selected.has(vo.key) ? '#fef9c340' : 'transparent', transition: 'background 0.15s' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
+            <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
+              <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
                 <input type="checkbox" checked={selected.has(vo.key)} onChange={() => toggleVerse(vo.key)} style={S.checkbox} />
+                <span className="mobile-verse-label">{vo.chineses} {vo.chap}:{vo.sec}</span>
               </div>
               {results.map((res, i) => {
                 const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
                 const vi = VERSIONS.find(v => v.id === res.version);
                 const col = VERSION_COLORS[res.version] || '#333';
                 return (
-                  <div key={i} style={{ color: col, lineHeight: 1.7, fontSize: 15 }}>
-                    <span style={{ color: col, fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.7 }}>
+                  <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: 15 }}>
+                    <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
+                    <span className="desktop-verse-num" style={{ color: col, fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.7 }}>
                       {vo.chineses} {vo.chap}:{vo.sec}
                     </span>
                     {vd ? <HighlightText text={vd.bible_text.replace(/<[^>]+>/g, '')} keyword={keyword} /> : <span style={{ color: '#ccc' }}>--</span>}
