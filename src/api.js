@@ -27,12 +27,15 @@ async function loadLocalBible(version) {
   return data;
 }
 
-function getVersesFromLocal(data, abbrev, chap, sec) {
+function getVersesFromLocal(data, abbrev, chap, sec, stripSpaces = false) {
   const book = data.find(b => b.abbrev === abbrev);
   if (!book) return [];
   const chapIndex = parseInt(chap) - 1;
   const chapter = book.chapters[chapIndex];
   if (!chapter) return [];
+  
+  function processText(t) { return t ? (stripSpaces ? t.replace(/\s/g, '') : t) : ''; }
+
   if (sec) {
     if (sec.includes('-')) {
       const [start, end] = sec.split('-').map(Number);
@@ -40,15 +43,15 @@ function getVersesFromLocal(data, abbrev, chap, sec) {
       const endIdx = Math.min(chapter.length - 1, end - 1);
       const results = [];
       for (let i = startIdx; i <= endIdx; i++) {
-        if (chapter[i]) results.push({ sec: i + 1, bible_text: chapter[i] });
+        if (chapter[i]) results.push({ sec: i + 1, bible_text: processText(chapter[i]) });
       }
       return results;
     } else {
       const text = chapter[parseInt(sec) - 1];
-      return text ? [{ sec: parseInt(sec), bible_text: text }] : [];
+      return text ? [{ sec: parseInt(sec), bible_text: processText(text) }] : [];
     }
   }
-  return chapter.map((text, i) => ({ sec: i + 1, bible_text: text || '' }));
+  return chapter.map((text, i) => ({ sec: i + 1, bible_text: processText(text) }));
 }
 
 /** Detect if a string is mostly Chinese characters */
@@ -79,7 +82,7 @@ function searchLocalBible(data, keyword, stripSpaces = false) {
             localAbbrev,
             chap: chapIdx + 1,
             sec: verseIdx + 1,
-            bible_text: text,
+            bible_text: stripSpaces ? searchText : text,
           });
         }
       });
@@ -89,7 +92,7 @@ function searchLocalBible(data, keyword, stripSpaces = false) {
 }
 
 /** Look up specific verses from a local bible by their references */
-function lookupVerses(data, refs) {
+function lookupVerses(data, refs, stripSpaces = false) {
   const results = [];
   for (const ref of refs) {
     const book = data.find(b => b.abbrev === ref.localAbbrev);
@@ -97,7 +100,8 @@ function lookupVerses(data, refs) {
     const chapter = book.chapters[ref.chap - 1];
     if (!chapter) { results.push({ ...ref, bible_text: '--' }); continue; }
     const text = chapter[ref.sec - 1];
-    results.push({ chineses: ref.chineses, chap: ref.chap, sec: ref.sec, bible_text: text || '--' });
+    const finalTxt = text ? (stripSpaces ? text.replace(/\s/g, '') : text) : '--';
+    results.push({ chineses: ref.chineses, chap: ref.chap, sec: ref.sec, bible_text: finalTxt });
   }
   return results;
 }
@@ -107,7 +111,8 @@ function lookupVerses(data, refs) {
 async function fetchLocalVersion(version, abbrev, chap, sec) {
   try {
     const data = await loadLocalBible(version);
-    return { version, record: getVersesFromLocal(data, abbrev, chap, sec) };
+    const stripSpaces = STRIP_SPACE_VERSIONS.includes(version);
+    return { version, record: getVersesFromLocal(data, abbrev, chap, sec, stripSpaces) };
   } catch (e) {
     console.error(`Error loading local ${version}:`, e);
     return { version, error: '讀取失敗', record: [] };
@@ -166,7 +171,8 @@ export async function fetchBible(query, versions) {
     }
     try {
       const localData = await loadLocalBible(v);
-      const record = lookupVerses(localData, refs);
+      const stripSpace = STRIP_SPACE_VERSIONS.includes(v);
+      const record = lookupVerses(localData, refs, stripSpace);
       return { version: v, record };
     } catch (e) {
       return { version: v, error: '讀取失敗', record: [] };
