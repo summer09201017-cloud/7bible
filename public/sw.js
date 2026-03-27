@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bible-app-v2';
+const CACHE_NAME = 'bible-app-v3';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
