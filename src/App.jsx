@@ -378,7 +378,7 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [versions, setVersions] = useState(['unv', 'esv', 'web', 'ncv', 'lzz', 'asv', 'kjv']);
+  const [versions, setVersions] = useState(['unv', 'esv', 'web', 'ncv', 'lzz']);
   const [bibleStructure, setBibleStructure] = useState(null);
 
   useEffect(() => {
