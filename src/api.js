@@ -140,7 +140,7 @@ export async function fetchBible(query, versions) {
     if (!abbrev) throw new Error(`找不到書卷：${rawBook}`);
     const promises = versions.map(v => fetchLocalVersion(v, abbrev, chap, sec));
     const results = await Promise.all(promises);
-    return { mode: 'verse', chap, sec, results };
+    return { mode: 'verse', abbrev, chap, sec, results };
   }
 
   // ── Mode 2: Keyword search ──
