@@ -270,6 +270,9 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
         <button type="submit" disabled={isLoading} style={{ ...S.btnSearch, padding: '12px 32px', fontSize: 16 }}>
           {isLoading ? '⏳ 查詢中...' : '🔍 查詢'}
         </button>
+        <button type="button" onClick={() => document.dispatchEvent(new CustomEvent('global-copy'))} style={{ ...S.btnCopy, padding: '12px 32px', fontSize: 16 }}>
+          📋 複製經文
+        </button>
       </form>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
         {VERSIONS.map(v => (
@@ -303,6 +306,16 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
     }
     return formatVersesForShare(lines);
   };
+
+  useEffect(() => {
+    const handler = () => {
+      const txt = getSelectedText();
+      if (txt) { copyToClipboard(txt); alert('✅ 已複製勾選的經文！'); }
+      else { alert('⚠️ 請先勾選要複製的經文！'); }
+    };
+    document.addEventListener('global-copy', handler);
+    return () => document.removeEventListener('global-copy', handler);
+  }, [selected, results]);
 
   return (
     <div style={S.resultCard}>
@@ -390,6 +403,21 @@ function KeywordViewer({ data, onNavigate }) {
     const text = formatVersesForShare(lines);
     if (text) { await copyToClipboard(text); setTopCopied(true); setTimeout(() => setTopCopied(false), 2000); }
   };
+
+  useEffect(() => {
+    const handler = () => {
+      if (selected.size === 0) {
+        handleTopCopy();
+        alert('✅ 已複製全部經文！');
+      } else {
+        const txt = getSelectedText();
+        copyToClipboard(txt);
+        alert('✅ 已複製勾選的經文！');
+      }
+    };
+    document.addEventListener('global-copy', handler);
+    return () => document.removeEventListener('global-copy', handler);
+  }, [selected, verses, results]);
 
   const goToChapter = (chineses, chap) => {
     if (onNavigate) {
