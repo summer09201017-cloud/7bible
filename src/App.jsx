@@ -224,7 +224,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
   return (
     <div style={{ ...S.card, padding: 24, marginBottom: 24, maxWidth: 900, marginLeft: 'auto', marginRight: 'auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1b5e20', textAlign: 'center', marginBottom: 20, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-        📖 多譯本聖經查詢
+        📖 多譯本聖經查詢 <small style={{ fontSize: 13, color: '#66bb6a', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.3</small>
       </h1>
 
       {/* Book / Chapter / Verse Selectors */}
