@@ -113,8 +113,8 @@ async function fetchLocalVersion(version, abbrev, chap, sec) {
     const data = await loadLocalBible(version);
     const stripSpaces = STRIP_SPACE_VERSIONS.includes(version);
     return { version, record: getVersesFromLocal(data, abbrev, chap, sec, stripSpaces) };
-  } catch (e) {
-    console.error(`Error loading local ${version}:`, e);
+  } catch (_e) {
+    console.error(`Error loading local ${version}:`, _e);
     return { version, error: '讀取失敗', record: [] };
   }
 }
@@ -174,7 +174,7 @@ export async function fetchBible(query, versions) {
       const stripSpace = STRIP_SPACE_VERSIONS.includes(v);
       const record = lookupVerses(localData, refs, stripSpace);
       return { version: v, record };
-    } catch (e) {
+    } catch {
       return { version: v, error: '讀取失敗', record: [] };
     }
   }));
