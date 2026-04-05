@@ -18,7 +18,7 @@ const S = {
   bg: { background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e0f2e1 100%)', minHeight: '100vh' },
   card: { background: 'linear-gradient(145deg, #ffffff, #f1f8e9)', boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #c8e6c9', borderRadius: '16px' },
   input: { background: 'linear-gradient(145deg, #ffffff, #f9fff5)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05), 0 1px 0 rgba(255,255,255,0.9)', border: '2px solid #a5d6a7', borderRadius: '12px' },
-  btnSearch: { background: 'linear-gradient(145deg, #43a047, #1b5e20)', boxShadow: '0 4px 8px rgba(27,94,32,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
+  btnSearch: { background: 'linear-gradient(145deg, #e53935, #b71c1c)', boxShadow: '0 4px 8px rgba(183,28,28,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
   btnCopy: { background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 3px 6px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
   btnCopied: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', boxShadow: '0 3px 6px rgba(46,125,50,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
   btnLine: { background: 'linear-gradient(145deg, #4caf50, #1b5e20)', boxShadow: '0 3px 6px rgba(27,94,32,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
@@ -67,7 +67,7 @@ async function copyToClipboard(text) {
 }
 
 // ─── ActionBar ───────────────────────────────────────────────────────────────
-function ActionBar({ getSelectedText, selectedCount, large }) {
+function ActionBar({ getSelectedText, selectedCount, large, isTop }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
     const text = getSelectedText(); if (!text) return;
@@ -75,19 +75,20 @@ function ActionBar({ getSelectedText, selectedCount, large }) {
   };
   const disabled = selectedCount === 0;
   const disabledStyle = disabled ? { opacity: 0.4, cursor: 'not-allowed' } : {};
-  const sz = large ? { padding: '10px 22px', fontSize: 16 } : { padding: '6px 14px', fontSize: 12 };
+  const sz = large ? { padding: '16px 24px', fontSize: 20, minWidth: '250px', flexGrow: 1, justifyContent: 'center' } : { padding: '6px 14px', fontSize: 12 };
+  const shareSz = large ? { padding: '12px 20px', fontSize: 16 } : { padding: '6px 14px', fontSize: 12 };
   return (
-    <div style={{ ...S.actionBar, padding: '12px 16px', position: 'sticky', bottom: 0, zIndex: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-      <span style={{ fontSize: large ? 14 : 12, color: '#555', marginRight: 4 }}>
+    <div style={{ ...S.actionBar, padding: '16px', position: 'sticky', bottom: isTop ? 'auto' : 0, top: isTop ? 44 : 'auto', zIndex: 9, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: large ? 16 : 12, color: '#555', marginRight: 4, whiteSpace: 'nowrap' }}>
         已選 <strong style={{ color: '#2e7d32' }}>{selectedCount}</strong> 節
       </span>
-      <button onClick={handleCopy} disabled={disabled} style={{ ...(copied ? S.btnCopied : S.btnCopy), ...disabledStyle, ...sz, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <button onClick={handleCopy} disabled={disabled} className="btn-active-effect" style={{ ...(copied ? S.btnCopied : S.btnCopy), ...disabledStyle, ...sz, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         {copied ? '✅ 已複製' : '📋 複製經文'}
       </button>
-      <button onClick={() => shareToLine(getSelectedText())} disabled={disabled} style={{ ...S.btnLine, ...disabledStyle, ...sz, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <button onClick={() => shareToLine(getSelectedText())} disabled={disabled} className="btn-active-effect" style={{ ...S.btnLine, ...disabledStyle, ...shareSz, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
         💬 分享到 Line
       </button>
-      <button onClick={() => shareToEmail(getSelectedText())} disabled={disabled} style={{ ...S.btnEmail, ...disabledStyle, ...sz, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <button onClick={() => shareToEmail(getSelectedText())} disabled={disabled} className="btn-active-effect" style={{ ...S.btnEmail, ...disabledStyle, ...shareSz, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
         ✉️ Email 分享
       </button>
     </div>
@@ -133,16 +134,18 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
         <button
           disabled={!hasPrevChap}
           onClick={() => go(`${bookName} ${chapNum - 1}`)}
+          className="btn-active-effect"
           style={hasPrevChap ? btnNav : btnNavDisabled}
         >
           ◀ 上一章
         </button>
-        <span style={{ fontSize: 15, fontWeight: 700, color: '#1b5e20', display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: 16, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 12px' }}>
           📖 {bookName} 第 {chapNum} 章 {isSingleVerse ? `第 ${secNum} 節` : ''}
         </span>
         <button
           disabled={!hasNextChap}
           onClick={() => go(`${bookName} ${chapNum + 1}`)}
+          className="btn-active-effect"
           style={hasNextChap ? btnNav : btnNavDisabled}
         >
           下一章 ▶
@@ -176,7 +179,7 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
 
 // ─── SearchBar ───────────────────────────────────────────────────────────────
 function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure }) {
-  const [query, setQuery] = useState('John 3:16');
+  const [query, setQuery] = useState('請輸入關鍵字');
   const [selBook, setSelBook] = useState('');
   const [selChap, setSelChap] = useState('');
   const [selVerse, setSelVerse] = useState('');
@@ -267,10 +270,10 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
           onFocus={(e) => e.target.style.borderColor = '#43a047'}
           onBlur={(e) => e.target.style.borderColor = '#a5d6a7'}
         />
-        <button type="submit" disabled={isLoading} style={{ ...S.btnSearch, padding: '12px 32px', fontSize: 16 }}>
+        <button type="submit" disabled={isLoading} className="btn-active-effect" style={{ ...S.btnSearch, padding: '18px 64px', fontSize: 22, minWidth: '180px' }}>
           {isLoading ? '⏳ 查詢中...' : '🔍 查詢'}
         </button>
-        <button type="button" onClick={() => document.dispatchEvent(new CustomEvent('global-copy'))} style={{ ...S.btnCopy, padding: '12px 32px', fontSize: 16 }}>
+        <button type="button" onClick={() => document.dispatchEvent(new CustomEvent('global-copy'))} className="btn-active-effect" style={{ ...S.btnCopy, padding: '18px 48px', fontSize: 18 }}>
           📋 複製經文
         </button>
       </form>
@@ -320,7 +323,7 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
   return (
     <div style={S.resultCard}>
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
-      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large />
+      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large isTop />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -336,7 +339,15 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
             <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
               <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
                 <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} style={S.checkbox} />
-                <span className="mobile-verse-label">第 {vNum} 節</span>
+                <a 
+                  onClick={(e) => { e.preventDefault(); const bName = bookMap.find(b => b.localAbbrev === data.abbrev)?.names[0] || data.abbrev; onNavigate(`${bName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  href="#"
+                  className="mobile-verse-label"
+                  style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }}
+                  title={`跳到 ${data.chap} 章`}
+                >
+                  第 {vNum} 節
+                </a>
               </div>
               {results.map((res, i) => {
                 const vd = res.record?.find(r => r.sec == vNum);
@@ -346,7 +357,15 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
                 return (
                   <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: 15 }}>
                      <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
-                    <span className="desktop-verse-num" style={{ color: col, fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top' }}>{vNum}</span>
+                    <a
+                      onClick={(e) => { e.preventDefault(); const bName = bookMap.find(b => b.localAbbrev === data.abbrev)?.names[0] || data.abbrev; onNavigate(`${bName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      href="#"
+                      className="desktop-verse-num"
+                      style={{ color: '#1565c0', fontSize: 13, fontWeight: 700, marginRight: 6, verticalAlign: 'top', textDecoration: 'underline', cursor: 'pointer' }}
+                      title={`跳到 ${data.chap} 章`}
+                    >
+                      {vNum}
+                    </a>
                     <span dangerouslySetInnerHTML={{ __html: text.replace(/<[^>]+>/g, '') }} />
                   </div>
                 );
@@ -433,7 +452,7 @@ function KeywordViewer({ data, onNavigate }) {
       <div style={{ ...S.statsBar, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 16px' }}>
         <span style={{ color: '#b45309', fontSize: 14, fontWeight: 600 }}>🔍 關鍵字：<strong>「{keyword}」</strong></span>
         <span style={{ color: '#92400e', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆（{verses.length} 節）</span>
-        <button onClick={handleTopCopy} style={{ ...(topCopied ? S.btnCopied : S.btnCopy), padding: '8px 20px', fontSize: 15, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={handleTopCopy} className="btn-active-effect" style={{ ...(topCopied ? S.btnCopied : S.btnCopy), padding: '16px 32px', fontSize: 20, minWidth: '250px', flexGrow: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           {topCopied ? '✅ 已複製全部' : '📋 複製全部經文'}
         </button>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginLeft: 'auto' }}>
@@ -445,6 +464,7 @@ function KeywordViewer({ data, onNavigate }) {
           })}
         </div>
       </div>
+      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large isTop />
       {/* Headers */}
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
