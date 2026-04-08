@@ -18,7 +18,7 @@ const S = {
   bg: { background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e0f2e1 100%)', minHeight: '100vh' },
   card: { background: 'linear-gradient(145deg, #ffffff, #f1f8e9)', boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #c8e6c9', borderRadius: '16px' },
   input: { background: 'linear-gradient(145deg, #ffffff, #f9fff5)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05), 0 1px 0 rgba(255,255,255,0.9)', border: '2px solid #a5d6a7', borderRadius: '12px' },
-  btnSearch: { background: 'linear-gradient(145deg, #e53935, #b71c1c)', boxShadow: '0 4px 8px rgba(183,28,28,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
+  btnSearch: { background: 'linear-gradient(145deg, #e53935, #b71c1c)', boxShadow: '0 4px 8px rgba(183,28,28,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', width: '100%' },
   btnCopy: { background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 3px 6px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
   btnCopied: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', boxShadow: '0 3px 6px rgba(46,125,50,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
   btnLine: { background: 'linear-gradient(145deg, #4caf50, #1b5e20)', boxShadow: '0 3px 6px rgba(27,94,32,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
@@ -99,9 +99,9 @@ function ActionBar({ getSelectedText, selectedCount, large, isTop }) {
 const btnNav = {
   background: 'linear-gradient(145deg, #43a047, #2e7d32)',
   color: 'white', border: 'none', borderRadius: 10, fontWeight: 700,
-  cursor: 'pointer', padding: '10px 20px', fontSize: 15,
-  boxShadow: '0 3px 8px rgba(46,125,50,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
-  transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 6,
+  cursor: 'pointer', padding: '6px 14px', fontSize: 13,
+  boxShadow: '0 2px 5px rgba(46,125,50,0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
+  transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 4,
 };
 const btnNavDisabled = { ...btnNav, opacity: 0.35, cursor: 'not-allowed', boxShadow: 'none' };
 
@@ -128,7 +128,7 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
   const go = (q) => { onNavigate(q); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', borderTop: '1px solid #a5d6a7', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+    <div style={{ background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', borderTop: '1px solid #a5d6a7', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
       {/* 章導航 */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button
@@ -139,8 +139,8 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
         >
           ◀ 上一章
         </button>
-        <span style={{ fontSize: 16, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-          📖 {bookName} 第 {chapNum} 章 {isSingleVerse ? `第 ${secNum} 節` : ''}
+        <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+          📖 {bookName} {chapNum} 章 {isSingleVerse ? `${secNum}節` : ''}
         </span>
         <button
           disabled={!hasNextChap}
@@ -179,7 +179,7 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
 
 // ─── SearchBar ───────────────────────────────────────────────────────────────
 function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure }) {
-  const [query, setQuery] = useState('請輸入關鍵字');
+  const [query, setQuery] = useState('');
   const [selBook, setSelBook] = useState('');
   const [selChap, setSelChap] = useState('');
   const [selVerse, setSelVerse] = useState('');
@@ -227,54 +227,52 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
         📖 多譯本聖經查詢 <small style={{ fontSize: 13, color: '#66bb6a', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.3</small>
       </h1>
 
-      {/* Book / Chapter / Verse Selectors */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }} style={S.select}>
-          <option value="">📖 選擇書卷</option>
-          {bibleStructure && bibleStructure.map(b => {
-             const bInfo = bookMap.find(bm => bm.localAbbrev === b.abbrev);
-             return <option key={b.abbrev} value={b.abbrev}>{bInfo ? bInfo.names[1] : b.name}</option>;
-          })}
-        </select>
-        
-        <select value={selChap} onChange={(e) => { setSelChap(e.target.value); setSelVerse(''); setSelEndVerse(''); }} disabled={!selBook} style={{ ...S.select, opacity: selBook ? 1 : 0.5 }}>
-          <option value="">🔖 選擇章</option>
-          {chaptersCount > 0 && Array.from({ length: chaptersCount }, (_, i) => (
-            <option key={i + 1} value={i + 1}>第 {i + 1} 章</option>
-          ))}
-        </select>
-
-        <select value={selVerse} onChange={(e) => { setSelVerse(e.target.value); setSelEndVerse(''); }} disabled={!selChap} style={{ ...S.select, opacity: selChap ? 1 : 0.5 }}>
-          <option value="">📍 起始節 (選填)</option>
-          {versesCount > 0 && Array.from({ length: versesCount }, (_, i) => (
-            <option key={i + 1} value={i + 1}>第 {i + 1} 節</option>
-          ))}
-        </select>
-
-        <select value={selEndVerse} onChange={(e) => setSelEndVerse(e.target.value)} disabled={!selVerse} style={{ ...S.select, opacity: selVerse ? 1 : 0.5 }}>
-          <option value="">🏁 結束節 (單節留空)</option>
-          {versesCount > 0 && selVerse && Array.from({ length: versesCount - parseInt(selVerse) }, (_, i) => {
-            const verseNum = parseInt(selVerse) + i + 1;
-            return <option key={verseNum} value={verseNum}>至 {verseNum} 節</option>;
-          })}
-        </select>
-      </div>
-
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
         <input type="text" value={query} onChange={(e) => {
           setQuery(e.target.value);
           if (selBook) { setSelBook(''); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }
         }}
-          placeholder="書卷章節：創 1、John 3:16-18　關鍵字：愛心、faith"
-          style={{ ...S.input, flex: 1, minWidth: 200, padding: '12px 16px', fontSize: 15, outline: 'none', color: '#333' }}
+          placeholder="關鍵字或書卷章節 (例如：愛心、創 1、John 3:16)"
+          style={{ ...S.input, width: '100%', padding: '14px 18px', fontSize: 16, outline: 'none', color: '#333' }}
           onFocus={(e) => e.target.style.borderColor = '#43a047'}
           onBlur={(e) => e.target.style.borderColor = '#a5d6a7'}
         />
-        <button type="submit" disabled={isLoading} className="btn-active-effect" style={{ ...S.btnSearch, padding: '18px 64px', fontSize: 22, minWidth: '180px' }}>
+
+        {/* Book / Chapter / Verse Selectors */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }} style={S.select}>
+            <option value="">📖 選擇書卷</option>
+            {bibleStructure && bibleStructure.map(b => {
+               const bInfo = bookMap.find(bm => bm.localAbbrev === b.abbrev);
+               return <option key={b.abbrev} value={b.abbrev}>{bInfo ? bInfo.names[1] : b.name}</option>;
+            })}
+          </select>
+          
+          <select value={selChap} onChange={(e) => { setSelChap(e.target.value); setSelVerse(''); setSelEndVerse(''); }} disabled={!selBook} style={{ ...S.select, opacity: selBook ? 1 : 0.5 }}>
+            <option value="">🔖 章</option>
+            {chaptersCount > 0 && Array.from({ length: chaptersCount }, (_, i) => (
+              <option key={i + 1} value={i + 1}>{i + 1} 章</option>
+            ))}
+          </select>
+
+          <select value={selVerse} onChange={(e) => { setSelVerse(e.target.value); setSelEndVerse(''); }} disabled={!selChap} style={{ ...S.select, opacity: selChap ? 1 : 0.5 }}>
+            <option value="">📍 節</option>
+            {versesCount > 0 && Array.from({ length: versesCount }, (_, i) => (
+              <option key={i + 1} value={i + 1}>{i + 1} 節</option>
+            ))}
+          </select>
+
+          <select value={selEndVerse} onChange={(e) => setSelEndVerse(e.target.value)} disabled={!selVerse} style={{ ...S.select, opacity: selVerse ? 1 : 0.5 }}>
+            <option value="">🏁 至哪節</option>
+            {versesCount > 0 && selVerse && Array.from({ length: versesCount - parseInt(selVerse) }, (_, i) => {
+              const verseNum = parseInt(selVerse) + i + 1;
+               return <option key={verseNum} value={verseNum}>{verseNum} 節</option>;
+            })}
+          </select>
+        </div>
+
+        <button type="submit" disabled={isLoading} className="btn-active-effect" style={{ ...S.btnSearch, padding: '16px 0', fontSize: 20 }}>
           {isLoading ? '⏳ 查詢中...' : '🔍 查詢'}
-        </button>
-        <button type="button" onClick={() => document.dispatchEvent(new CustomEvent('global-copy'))} className="btn-active-effect" style={{ ...S.btnCopy, padding: '18px 48px', fontSize: 18 }}>
-          📋 複製經文
         </button>
       </form>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
