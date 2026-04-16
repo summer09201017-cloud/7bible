@@ -142,6 +142,7 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
         </button>
         <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
           📖 {bookName} {chapNum} 章 {isSingleVerse ? `${secNum}節` : ''}
+          {data.timeMs && <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 6, fontWeight: 500 }}>({data.timeMs}ms)</span>}
         </span>
         <button
           disabled={!hasNextChap}
@@ -357,7 +358,6 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize }) {
   const verseNums = new Set();
   results.forEach(res => res.record?.forEach(r => verseNums.add(r.sec)));
   const verses = Array.from(verseNums).sort((a, b) => a - b);
-  if (verses.length === 0) return <EmptyState text="找不到相關經文" />;
   const cols = results.length;
   const toggleVerse = (n) => { const s = new Set(selected); s.has(n) ? s.delete(n) : s.add(n); setSelected(s); };
   const toggleAll = () => { selected.size === verses.length ? setSelected(new Set()) : setSelected(new Set(verses)); };
@@ -381,6 +381,8 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize }) {
     document.addEventListener('global-copy', handler);
     return () => document.removeEventListener('global-copy', handler);
   }, [selected, results]);
+
+  if (verses.length === 0) return <EmptyState text="找不到相關經文" />;
 
   return (
     <div style={S.resultCard}>
@@ -447,6 +449,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize }) {
 function KeywordViewer({ data, onNavigate, fontSize }) {
   const { results, keyword } = data;
   const [selected, setSelected] = useState(new Set());
+  const [topCopied, setTopCopied] = useState(false);
   const verseMap = new Map();
   results.forEach(res => {
     res.record?.forEach(r => {
@@ -458,11 +461,11 @@ function KeywordViewer({ data, onNavigate, fontSize }) {
     });
   });
   const verses = Array.from(verseMap.values()).sort((a, b) => a.bookIndex !== b.bookIndex ? a.bookIndex - b.bookIndex : a.chap !== b.chap ? a.chap - b.chap : a.sec - b.sec);
-  if (verses.length === 0) return <EmptyState text={`找不到含有「${keyword}」的經文`} />;
   const totalCount = results.reduce((s, r) => s + (r.record?.length || 0), 0);
   const cols = results.length;
   const toggleVerse = (key) => { const s = new Set(selected); s.has(key) ? s.delete(key) : s.add(key); setSelected(s); };
   const toggleAll = () => { selected.size === verses.length ? setSelected(new Set()) : setSelected(new Set(verses.map(v => v.key))); };
+
   const getSelectedText = () => {
     const lines = [];
     for (const vo of verses) {
@@ -476,7 +479,6 @@ function KeywordViewer({ data, onNavigate, fontSize }) {
     return formatVersesForShare(lines);
   };
 
-  const [topCopied, setTopCopied] = useState(false);
   const handleTopCopy = async () => {
     // Select all, copy, then deselect
     const allKeys = new Set(verses.map(v => v.key));
@@ -508,6 +510,8 @@ function KeywordViewer({ data, onNavigate, fontSize }) {
     return () => document.removeEventListener('global-copy', handler);
   }, [selected, verses, results]);
 
+  if (verses.length === 0) return <EmptyState text={`找不到含有「${keyword}」的經文`} />;
+
   const goToChapter = (chineses, chap) => {
     if (onNavigate) {
       const q = `${chineses} ${chap}`;
@@ -521,7 +525,7 @@ function KeywordViewer({ data, onNavigate, fontSize }) {
       {/* Stats + Top Copy Button */}
       <div style={{ ...S.statsBar, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 16px' }}>
         <span style={{ color: '#b45309', fontSize: 14, fontWeight: 600 }}>🔍 關鍵字：<strong>「{keyword}」</strong></span>
-        <span style={{ color: '#92400e', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆（{verses.length} 節）</span>
+        <span style={{ color: '#92400e', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆（{verses.length} 節）<span style={{ color: '#6b7280', fontSize: 12, marginLeft: 6, fontWeight: 500 }} title="查詢花費時間">{data.timeMs ? `${data.timeMs}ms` : ''}</span></span>
         <button onClick={handleTopCopy} className="btn-active-effect" style={{ ...(topCopied ? S.btnCopied : S.btnCopy), padding: '16px 32px', fontSize: 20, minWidth: '250px', flexGrow: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           {topCopied ? '✅ 已複製全部' : '📋 複製全部經文'}
         </button>
@@ -640,8 +644,13 @@ export default function App() {
   }, []);
 
   const handleSearch = useCallback(async (query, selectedVersions) => {
+    const t0 = performance.now();
     setLoading(true); setError(null);
-    try { const res = await fetchBible(query, selectedVersions); setData(res); }
+    try {
+      const res = await fetchBible(query, selectedVersions);
+      res.timeMs = Math.round(performance.now() - t0);
+      setData(res);
+    }
     catch (err) { setError(err.message); setData(null); }
     finally { setLoading(false); }
   }, []);
