@@ -578,16 +578,30 @@ function InstallButton() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installed, setInstalled] = useState(false);
   useEffect(() => {
-    const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
+    const handler = (e) => {
+      e.preventDefault();
+      window.deferredInstallPrompt = e;
+      setDeferredPrompt(e);
+    };
+    // 萬一事件早已觸發
+    if (window.deferredInstallPrompt) setDeferredPrompt(window.deferredInstallPrompt);
+
     window.addEventListener('beforeinstallprompt', handler);
     if (window.matchMedia('(display-mode: standalone)').matches) setInstalled(true);
     window.addEventListener('appinstalled', () => setInstalled(true));
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
   const handleInstall = async () => {
-    if (!deferredPrompt) { alert('📲 安裝方式：\n\n• iPhone Safari：點選底部「分享」→「加入主畫面」\n• Android Chrome：點選右上「⋮」→「安裝應用程式」\n• 電腦 Chrome：網址列右邊的安裝圖示'); return; }
-    deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setInstalled(true); setDeferredPrompt(null);
+    const promptEvent = deferredPrompt || window.deferredInstallPrompt;
+    if (!promptEvent) {
+      alert('📲 安裝方式：\n\n• 電腦 / Android：目前環境可能不支援或您已安裝過。如果未安裝，請透過網址列右側的【安裝】按鈕來安裝。\n• iPhone / iPad：請點選 Safari 底部工具列的「分享按鈕」，然後選擇「加入主畫面」。');
+      return;
+    }
+    promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
+    if (outcome === 'accepted') setInstalled(true);
+    setDeferredPrompt(null);
+    window.deferredInstallPrompt = null;
   };
   if (installed) return <span style={{ fontSize: 12, color: '#2e7d32', padding: '6px 14px', borderRadius: 999, border: '1px solid #a5d6a7', background: 'linear-gradient(145deg, #e8f5e9, #c8e6c9)', fontWeight: 600 }}>✅ 已安裝</span>;
   return <button onClick={handleInstall} style={{ ...S.btnInstall, padding: '10px 22px', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>📲 安裝 App</button>;
@@ -598,7 +612,7 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [versions, setVersions] = useState(['unv', 'niv', 'esv', 'web', 'ncv', 'lzz']);
+  const [versions, setVersions] = useState(['unv', 'niv', 'esv', 'ncv', 'lzz']);
   const [fontSize, setFontSize] = useState(15);
   const [bibleStructure, setBibleStructure] = useState(null);
 
