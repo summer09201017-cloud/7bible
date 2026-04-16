@@ -5,6 +5,7 @@ import { bookMap } from './bible_books';
 // ─── Per-version text colors ─────────────────────────────────────────────────
 const VERSION_COLORS = {
   unv: '#1a5276',   // 深藍 — 和合本
+  niv: '#0277bd',   // 深天藍 — NIV
   esv: '#7b241c',   // 深紅 — ESV
   web: '#1e8449',   // 深綠 — WEB
   ncv: '#6c3483',   // 紫色 — 新譯本
@@ -224,7 +225,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
   return (
     <div style={{ ...S.card, padding: 24, marginBottom: 24, maxWidth: 900, marginLeft: 'auto', marginRight: 'auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1b5e20', textAlign: 'center', marginBottom: 20, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-        📖 多譯本聖經查詢 <small style={{ fontSize: 13, color: '#66bb6a', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.3</small>
+        📖 多譯本聖經查詢 <small style={{ fontSize: 13, color: '#66bb6a', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.4</small>
       </h1>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
@@ -243,11 +244,11 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
           <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }} style={S.select}>
             <option value="">📖 選擇書卷</option>
             {bibleStructure && bibleStructure.map(b => {
-               const bInfo = bookMap.find(bm => bm.localAbbrev === b.abbrev);
-               return <option key={b.abbrev} value={b.abbrev}>{bInfo ? bInfo.names[1] : b.name}</option>;
+              const bInfo = bookMap.find(bm => bm.localAbbrev === b.abbrev);
+              return <option key={b.abbrev} value={b.abbrev}>{bInfo ? bInfo.names[1] : b.name}</option>;
             })}
           </select>
-          
+
           <select value={selChap} onChange={(e) => { setSelChap(e.target.value); setSelVerse(''); setSelEndVerse(''); }} disabled={!selBook} style={{ ...S.select, opacity: selBook ? 1 : 0.5 }}>
             <option value="">🔖 章</option>
             {chaptersCount > 0 && Array.from({ length: chaptersCount }, (_, i) => (
@@ -266,7 +267,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
             <option value="">🏁 至哪節</option>
             {versesCount > 0 && selVerse && Array.from({ length: versesCount - parseInt(selVerse) }, (_, i) => {
               const verseNum = parseInt(selVerse) + i + 1;
-               return <option key={verseNum} value={verseNum}>{verseNum} 節</option>;
+              return <option key={verseNum} value={verseNum}>{verseNum} 節</option>;
             })}
           </select>
         </div>
@@ -287,8 +288,54 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
   );
 }
 
+// ─── FHL commentary link helper ──────────────────────────────────────────────
+function getFhlCommentaryUrl(abbrev, chap, sec) {
+  const bEntry = bookMap.find(b => b.localAbbrev === abbrev);
+  if (!bEntry) return null;
+  return `https://bible.fhl.net/new/com.php?book=3&engs=${bEntry.engs}&chap=${chap}&sec=${sec}`;
+}
+
+function FhlLink({ abbrev, chap, sec }) {
+  const url = getFhlCommentaryUrl(abbrev, chap, sec);
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛經文註釋" style={{ color: '#ffb300', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid #ffe082', borderRadius: '4px', backgroundColor: '#fff8e1', fontWeight: 600, transition: 'all 0.2s', display: 'inline-block' }} onMouseEnter={e => { e.target.style.backgroundColor = '#ffecb3'; e.target.style.color = '#e65100'; }} onMouseLeave={e => { e.target.style.backgroundColor = '#fff8e1'; e.target.style.color = '#ffb300'; }}>
+      [信望愛註釋]
+    </a>
+  );
+}
+
+// ─── Font size control ───────────────────────────────────────────────────────
+const btnFontSize = {
+  background: 'linear-gradient(145deg, #ffffff, #f5f5f5)',
+  border: '2px solid #a5d6a7',
+  borderRadius: '10px',
+  color: '#1b5e20',
+  fontWeight: 700,
+  cursor: 'pointer',
+  padding: '6px 14px',
+  fontSize: 15,
+  transition: 'all 0.15s',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: 40,
+};
+
+function FontSizeControl({ fontSize, setFontSize }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
+      <span style={{ fontSize: 13, color: '#555', fontWeight: 600 }}>🔤 字型大小</span>
+      <button onClick={() => setFontSize(s => Math.max(12, s - 1))} style={btnFontSize} title="縮小">A-</button>
+      <span style={{ fontSize: 14, fontWeight: 700, color: '#1b5e20', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
+      <button onClick={() => setFontSize(s => Math.min(28, s + 1))} style={btnFontSize} title="放大">A+</button>
+      <button onClick={() => setFontSize(15)} style={{ ...btnFontSize, fontSize: 12, padding: '6px 10px' }} title="重置">重置</button>
+    </div>
+  );
+}
+
 // ─── Verse mode viewer ───────────────────────────────────────────────────────
-function VerseViewer({ data, bibleStructure, onNavigate }) {
+function VerseViewer({ data, bibleStructure, onNavigate, fontSize }) {
   const { results } = data;
   const [selected, setSelected] = useState(new Set());
   const verseNums = new Set();
@@ -301,7 +348,8 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
   const getSelectedText = () => {
     const lines = [];
     for (const vNum of Array.from(selected).sort((a, b) => a - b)) {
-      results.forEach(res => { const vi = VERSIONS.find(v => v.id === res.version); const vd = res.record?.find(r => r.sec == vNum);
+      results.forEach(res => {
+        const vi = VERSIONS.find(v => v.id === res.version); const vd = res.record?.find(r => r.sec == vNum);
         if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${vNum}`, text: vd.bible_text.replace(/<[^>]+>/g, '') });
       });
     }
@@ -337,7 +385,7 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
             <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
               <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
                 <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} style={S.checkbox} />
-                <a 
+                <a
                   onClick={(e) => { e.preventDefault(); const bName = bookMap.find(b => b.localAbbrev === data.abbrev)?.names[0] || data.abbrev; onNavigate(`${bName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   href="#"
                   className="mobile-verse-label"
@@ -353,8 +401,8 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
                 const vi = VERSIONS.find(v => v.id === res.version);
                 const col = VERSION_COLORS[res.version] || '#333';
                 return (
-                  <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: 15 }}>
-                     <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
+                  <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: fontSize || 15 }}>
+                    <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
                     <a
                       onClick={(e) => { e.preventDefault(); const bName = bookMap.find(b => b.localAbbrev === data.abbrev)?.names[0] || data.abbrev; onNavigate(`${bName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                       href="#"
@@ -365,6 +413,7 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
                       {vNum}
                     </a>
                     <span dangerouslySetInnerHTML={{ __html: text.replace(/<[^>]+>/g, '') }} />
+                    <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
                   </div>
                 );
               })}
@@ -379,15 +428,19 @@ function VerseViewer({ data, bibleStructure, onNavigate }) {
 }
 
 // ─── Keyword mode viewer ─────────────────────────────────────────────────────
-function KeywordViewer({ data, onNavigate }) {
+function KeywordViewer({ data, onNavigate, fontSize }) {
   const { results, keyword } = data;
   const [selected, setSelected] = useState(new Set());
   const verseMap = new Map();
-  results.forEach(res => { res.record?.forEach(r => {
-    const key = `${r.chineses}-${r.chap}-${r.sec}`;
-    if (!verseMap.has(key)) { const bi = bookMap.findIndex(b => b.names[0] === r.chineses || b.names.includes(r.chineses));
-      verseMap.set(key, { key, chineses: r.chineses, chap: r.chap, sec: r.sec, bookIndex: bi >= 0 ? bi : 999 }); }
-  }); });
+  results.forEach(res => {
+    res.record?.forEach(r => {
+      const key = `${r.chineses}-${r.chap}-${r.sec}`;
+      if (!verseMap.has(key)) {
+        const bi = bookMap.findIndex(b => b.names[0] === r.chineses || b.names.includes(r.chineses));
+        verseMap.set(key, { key, chineses: r.chineses, chap: r.chap, sec: r.sec, bookIndex: bi >= 0 ? bi : 999 });
+      }
+    });
+  });
   const verses = Array.from(verseMap.values()).sort((a, b) => a.bookIndex !== b.bookIndex ? a.bookIndex - b.bookIndex : a.chap !== b.chap ? a.chap - b.chap : a.sec - b.sec);
   if (verses.length === 0) return <EmptyState text={`找不到含有「${keyword}」的經文`} />;
   const totalCount = results.reduce((s, r) => s + (r.record?.length || 0), 0);
@@ -396,8 +449,10 @@ function KeywordViewer({ data, onNavigate }) {
   const toggleAll = () => { selected.size === verses.length ? setSelected(new Set()) : setSelected(new Set(verses.map(v => v.key))); };
   const getSelectedText = () => {
     const lines = [];
-    for (const vo of verses) { if (!selected.has(vo.key)) continue;
-      results.forEach(res => { const vi = VERSIONS.find(v => v.id === res.version);
+    for (const vo of verses) {
+      if (!selected.has(vo.key)) continue;
+      results.forEach(res => {
+        const vi = VERSIONS.find(v => v.id === res.version);
         const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
         if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${vo.chineses} ${vo.chap}:${vo.sec}`, text: vd.bible_text.replace(/<[^>]+>/g, '') });
       });
@@ -412,7 +467,8 @@ function KeywordViewer({ data, onNavigate }) {
     const lines = [];
     for (const vo of verses) {
       if (!allKeys.has(vo.key)) continue;
-      results.forEach(res => { const vi = VERSIONS.find(v => v.id === res.version);
+      results.forEach(res => {
+        const vi = VERSIONS.find(v => v.id === res.version);
         const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
         if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${vo.chineses} ${vo.chap}:${vo.sec}`, text: vd.bible_text.replace(/<[^>]+>/g, '') });
       });
@@ -487,7 +543,7 @@ function KeywordViewer({ data, onNavigate }) {
                 const vi = VERSIONS.find(v => v.id === res.version);
                 const col = VERSION_COLORS[res.version] || '#333';
                 return (
-                  <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: 15 }}>
+                  <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: fontSize || 15 }}>
                     <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
                     <a
                       onClick={(e) => { e.preventDefault(); goToChapter(vo.chineses, vo.chap); }}
@@ -499,6 +555,7 @@ function KeywordViewer({ data, onNavigate }) {
                       {vo.chineses} {vo.chap}:{vo.sec}
                     </a>
                     {vd ? <HighlightText text={vd.bible_text.replace(/<[^>]+>/g, '')} keyword={keyword} /> : <span style={{ color: '#ccc' }}>--</span>}
+                    <FhlLink abbrev={bookMap.find(b => b.names[0] === vo.chineses)?.localAbbrev} chap={vo.chap} sec={vo.sec} />
                   </div>
                 );
               })}
@@ -541,7 +598,8 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [versions, setVersions] = useState(['unv', 'esv', 'web', 'ncv', 'lzz']);
+  const [versions, setVersions] = useState(['unv', 'niv', 'esv', 'web', 'ncv', 'lzz']);
+  const [fontSize, setFontSize] = useState(15);
   const [bibleStructure, setBibleStructure] = useState(null);
 
   useEffect(() => {
@@ -562,15 +620,16 @@ export default function App() {
     <div style={{ ...S.bg, padding: '32px 16px', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1600, margin: '0 auto' }}>
         <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} />
+        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
           <InstallButton />
         </div>
         {error && <div style={{ background: 'linear-gradient(145deg, #ffebee, #ffcdd2)', border: '1px solid #ef9a9a', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: '#c62828' }}>⚠️ {error}</div>}
         {loading && <div style={{ textAlign: 'center', color: '#2e7d32', padding: '64px 0', fontSize: 18, fontWeight: 600 }}>⏳ 搜尋中，請稍候…</div>}
-        {!loading && data && data.mode === 'verse' && <VerseViewer data={data} bibleStructure={bibleStructure} onNavigate={(q) => handleSearch(q, versions)} />}
-        {!loading && data && data.mode === 'keyword' && <KeywordViewer data={data} onNavigate={(q) => handleSearch(q, versions)} />}
+        {!loading && data && data.mode === 'verse' && <VerseViewer data={data} bibleStructure={bibleStructure} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} />}
+        {!loading && data && data.mode === 'keyword' && <KeywordViewer data={data} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} />}
         <footer style={{ marginTop: 48, textAlign: 'center', color: '#81c784', fontSize: 12, paddingBottom: 32 }}>
-          資料來源：信望愛 (FHL) 聖經 ・ 本機 JSON ・ 7 種譯本離線可用
+          資料來源：信望愛 (FHL) 聖經 ・ 本機 JSON ・ 8 種譯本離線可用
         </footer>
       </div>
     </div>

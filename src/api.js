@@ -3,6 +3,7 @@ import { findLocalAbbrev, bookMap } from './bible_books';
 // Version details for UI — order = display order (左→右)
 export const VERSIONS = [
   { id: 'unv', label: '和合本 (CUV)' },
+  { id: 'niv', label: 'NIV' },
   { id: 'esv', label: 'ESV' },
   { id: 'web', label: 'WEB' },
   { id: 'ncv', label: '新譯本 (NCV)' },
@@ -17,6 +18,9 @@ const STRIP_SPACE_VERSIONS = ['unv'];
 // In-memory cache so we don't re-fetch JSON every query
 const localCache = {};
 
+// NIV book-level cache (per nivFile key)
+const nivBookCache = {};
+
 // ─── Local JSON helpers ───────────────────────────────────────────────────────
 
 async function loadLocalBible(version) {
@@ -27,13 +31,108 @@ async function loadLocalBible(version) {
   return data;
 }
 
+// ─── NIV helpers (per-book JSON: { "1": [...], "2": [...] }) ──────────────────
+
+async function loadNivBook(nivFile) {
+  const cacheKey = `niv_${nivFile}`;
+  if (nivBookCache[cacheKey]) return nivBookCache[cacheKey];
+  const res = await fetch(`/data/NIV/${nivFile}.json`);
+  const data = await res.json();
+  nivBookCache[cacheKey] = data;
+  return data;
+}
+
+function getNivVerses(bookData, chap, sec) {
+  const chapter = bookData[String(chap)];
+  if (!chapter) return [];
+
+  if (sec) {
+    if (sec.includes('-')) {
+      const [start, end] = sec.split('-').map(Number);
+      const results = [];
+      for (let i = start; i <= Math.min(end, chapter.length); i++) {
+        if (chapter[i - 1]) results.push({ sec: i, bible_text: chapter[i - 1] });
+      }
+      return results;
+    } else {
+      const text = chapter[parseInt(sec) - 1];
+      return text ? [{ sec: parseInt(sec), bible_text: text }] : [];
+    }
+  }
+  return chapter.map((text, i) => ({ sec: i + 1, bible_text: text }));
+}
+
+async function fetchNivVersion(abbrev, chap, sec) {
+  try {
+    const bEntry = bookMap.find(b => b.localAbbrev === abbrev);
+    if (!bEntry || !bEntry.nivFile) return { version: 'niv', record: [] };
+    const bookData = await loadNivBook(bEntry.nivFile);
+    return { version: 'niv', record: getNivVerses(bookData, chap, sec) };
+  } catch (_e) {
+    console.error('Error loading NIV:', _e);
+    return { version: 'niv', error: '讀取失敗', record: [] };
+  }
+}
+
+async function searchNivBible(keyword) {
+  const lowerKw = keyword.toLowerCase();
+  const matches = [];
+  for (let bookIdx = 0; bookIdx < bookMap.length; bookIdx++) {
+    const bEntry = bookMap[bookIdx];
+    if (!bEntry.nivFile) continue;
+    try {
+      const bookData = await loadNivBook(bEntry.nivFile);
+      const chapNums = Object.keys(bookData).sort((a, b) => Number(a) - Number(b));
+      for (const chapStr of chapNums) {
+        const chapter = bookData[chapStr];
+        if (!chapter) continue;
+        chapter.forEach((text, verseIdx) => {
+          if (!text) return;
+          if (text.toLowerCase().includes(lowerKw)) {
+            matches.push({
+              chineses: bEntry.names[0],
+              localAbbrev: bEntry.localAbbrev,
+              chap: parseInt(chapStr),
+              sec: verseIdx + 1,
+              bible_text: text,
+            });
+          }
+        });
+      }
+    } catch (_e) {
+      console.error(`Error searching NIV book ${bEntry.nivFile}:`, _e);
+    }
+  }
+  return matches;
+}
+
+async function lookupNivVerses(refs) {
+  const results = [];
+  for (const ref of refs) {
+    const bEntry = bookMap.find(b => b.localAbbrev === ref.localAbbrev);
+    if (!bEntry || !bEntry.nivFile) { results.push({ ...ref, bible_text: '--' }); continue; }
+    try {
+      const bookData = await loadNivBook(bEntry.nivFile);
+      const chapter = bookData[String(ref.chap)];
+      if (!chapter) { results.push({ chineses: ref.chineses, chap: ref.chap, sec: ref.sec, bible_text: '--' }); continue; }
+      const text = chapter[ref.sec - 1];
+      results.push({ chineses: ref.chineses, chap: ref.chap, sec: ref.sec, bible_text: text || '--' });
+    } catch {
+      results.push({ chineses: ref.chineses, chap: ref.chap, sec: ref.sec, bible_text: '--' });
+    }
+  }
+  return results;
+}
+
+// ─── Standard (non-NIV) helpers ───────────────────────────────────────────────
+
 function getVersesFromLocal(data, abbrev, chap, sec, stripSpaces = false) {
   const book = data.find(b => b.abbrev === abbrev);
   if (!book) return [];
   const chapIndex = parseInt(chap) - 1;
   const chapter = book.chapters[chapIndex];
   if (!chapter) return [];
-  
+
   function processText(t) { return t ? (stripSpaces ? t.replace(/\s/g, '') : t) : ''; }
 
   if (sec) {
@@ -109,6 +208,10 @@ function lookupVerses(data, refs, stripSpaces = false) {
 // ─── Verse-by-reference ───────────────────────────────────────────────────────
 
 async function fetchLocalVersion(version, abbrev, chap, sec) {
+  // NIV uses separate per-book JSON files
+  if (version === 'niv') {
+    return fetchNivVersion(abbrev, chap, sec);
+  }
   try {
     const data = await loadLocalBible(version);
     const stripSpaces = STRIP_SPACE_VERSIONS.includes(version);
@@ -135,7 +238,7 @@ export async function fetchBible(query, versions) {
     const secStart = match[3] || '';
     const secEnd = match[4] || '';
     const sec = secEnd ? `${secStart}-${secEnd}` : secStart;
-    
+
     const abbrev = findLocalAbbrev(rawBook);
     if (!abbrev) throw new Error(`找不到書卷：${rawBook}`);
     const promises = versions.map(v => fetchLocalVersion(v, abbrev, chap, sec));
@@ -153,8 +256,13 @@ export async function fetchBible(query, versions) {
   const stripSpaces = STRIP_SPACE_VERSIONS.includes(primaryVersion);
 
   // Step 1: Search primary version
-  const primaryData = await loadLocalBible(primaryVersion);
-  const primaryMatches = searchLocalBible(primaryData, trimmedQuery, stripSpaces);
+  let primaryMatches;
+  if (primaryVersion === 'niv') {
+    primaryMatches = await searchNivBible(trimmedQuery);
+  } else {
+    const primaryData = await loadLocalBible(primaryVersion);
+    primaryMatches = searchLocalBible(primaryData, trimmedQuery, stripSpaces);
+  }
 
   // Build reference list from primary matches
   const refs = primaryMatches.map(m => ({
@@ -168,6 +276,15 @@ export async function fetchBible(query, versions) {
   const results = await Promise.all(versions.map(async (v) => {
     if (v === primaryVersion) {
       return { version: v, record: primaryMatches };
+    }
+    // NIV uses its own lookup
+    if (v === 'niv') {
+      try {
+        const record = await lookupNivVerses(refs);
+        return { version: v, record };
+      } catch {
+        return { version: v, error: '讀取失敗', record: [] };
+      }
     }
     try {
       const localData = await loadLocalBible(v);
