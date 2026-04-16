@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bible-app-v3';
+const CACHE_NAME = 'bible-app-v4';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -31,7 +31,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: cache-first for local assets, network-first for API
+// Fetch: Strategy assignment
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -41,7 +41,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Everything else — cache first, then network
+  // HTML / Navigation requests — Network First, fallback to cache
+  // This guarantees the app shell (JS/CSS links) is always up to date.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Everything else (JSON, JS, CSS) — Cache First, then network
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
