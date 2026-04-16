@@ -204,6 +204,22 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
     }
   }, [selBook, selChap, selVerse, selEndVerse]);
 
+  // 自動搜尋與 Debounce 機制
+  useEffect(() => {
+    const q = query.trim();
+    // 只在 >=2 字元時自動查詢
+    if (q.length < 2) return;
+
+    // 第 2 個字時 debounce 0, 第 3 個字以上 120ms
+    const delay = q.length === 2 ? 0 : 120;
+
+    const timeout = setTimeout(() => {
+      onSearch(q, versions);
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [query, versions, onSearch]);
+
   const handleSubmit = (e) => { e.preventDefault(); if (query.trim()) onSearch(query, versions); };
   const handleVersionToggle = (vId) => {
     if (versions.includes(vId)) { if (versions.length > 1) setVersions(versions.filter(v => v !== vId)); }
