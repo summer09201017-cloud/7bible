@@ -343,9 +343,9 @@ function FontSizeControl({ fontSize, setFontSize }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
       <span style={{ fontSize: 13, color: '#555', fontWeight: 600 }}>🔤 字型大小</span>
-      <button onClick={() => setFontSize(s => Math.max(12, s - 1))} style={btnFontSize} title="縮小">A-</button>
+      <button onClick={() => setFontSize(s => Math.max(10, s - 1))} style={btnFontSize} title="縮小">A-</button>
       <span style={{ fontSize: 14, fontWeight: 700, color: '#1b5e20', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
-      <button onClick={() => setFontSize(s => Math.min(28, s + 1))} style={btnFontSize} title="放大">A+</button>
+      <button onClick={() => setFontSize(s => Math.min(40, s + 1))} style={btnFontSize} title="放大">A+</button>
       <button onClick={() => setFontSize(15)} style={{ ...btnFontSize, fontSize: 12, padding: '6px 10px' }} title="重置">重置</button>
     </div>
   );
