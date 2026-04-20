@@ -352,7 +352,7 @@ function FontSizeControl({ fontSize, setFontSize }) {
 }
 
 // ─── Verse mode viewer ───────────────────────────────────────────────────────
-function VerseViewer({ data, bibleStructure, onNavigate, fontSize }) {
+function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize }) {
   const { results } = data;
   const [selected, setSelected] = useState(new Set());
   const verseNums = new Set();
@@ -439,6 +439,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize }) {
           </div>
         ))}
       </div>
+      <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
       <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large />
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
     </div>
@@ -446,7 +447,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize }) {
 }
 
 // ─── Keyword mode viewer ─────────────────────────────────────────────────────
-function KeywordViewer({ data, onNavigate, fontSize }) {
+function KeywordViewer({ data, onNavigate, fontSize, setFontSize }) {
   const { results, keyword } = data;
   const [selected, setSelected] = useState(new Set());
   const [topCopied, setTopCopied] = useState(false);
@@ -583,6 +584,7 @@ function KeywordViewer({ data, onNavigate, fontSize }) {
           </div>
         ))}
       </div>
+      <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
       <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large />
     </div>
   );
@@ -665,8 +667,8 @@ export default function App() {
         </div>
         {error && <div style={{ background: 'linear-gradient(145deg, #ffebee, #ffcdd2)', border: '1px solid #ef9a9a', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: '#c62828' }}>⚠️ {error}</div>}
         {loading && <div style={{ textAlign: 'center', color: '#2e7d32', padding: '64px 0', fontSize: 18, fontWeight: 600 }}>⏳ 搜尋中，請稍候…</div>}
-        {!loading && data && data.mode === 'verse' && <VerseViewer data={data} bibleStructure={bibleStructure} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} />}
-        {!loading && data && data.mode === 'keyword' && <KeywordViewer data={data} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} />}
+        {!loading && data && data.mode === 'verse' && <VerseViewer data={data} bibleStructure={bibleStructure} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} setFontSize={setFontSize} />}
+        {!loading && data && data.mode === 'keyword' && <KeywordViewer data={data} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} setFontSize={setFontSize} />}
         <footer style={{ marginTop: 48, textAlign: 'center', color: '#81c784', fontSize: 12, paddingBottom: 32 }}>
           資料來源：信望愛 (FHL) 聖經 ・ 本機 JSON ・ 8 種譯本離線可用
         </footer>
