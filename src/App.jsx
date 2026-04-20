@@ -339,9 +339,9 @@ const btnFontSize = {
   minWidth: 40,
 };
 
-function FontSizeControl({ fontSize, setFontSize }) {
+function FontSizeControl({ fontSize, setFontSize, sticky }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, ...(sticky ? { position: 'sticky', top: 0, zIndex: 100, background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e0f2e1 100%)', padding: '10px 16px', borderBottom: '1px solid #c8e6c9', boxShadow: '0 2px 8px rgba(76,175,80,0.15)' } : { marginBottom: 20 }) }}>
       <span style={{ fontSize: 13, color: '#555', fontWeight: 600 }}>🔤 字型大小</span>
       <button onClick={() => setFontSize(s => Math.max(10, s - 1))} style={btnFontSize} title="縮小">A-</button>
       <span style={{ fontSize: 14, fontWeight: 700, color: '#1b5e20', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
@@ -661,7 +661,7 @@ export default function App() {
     <div style={{ ...S.bg, padding: '32px 16px', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1600, margin: '0 auto' }}>
         <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} />
-        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
+        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} sticky />
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
           <InstallButton />
         </div>
