@@ -99,10 +99,10 @@ function ActionBar({ getSelectedText, selectedCount, large, isTop }) {
 // ─── ChapterNavBar ───────────────────────────────────────────────────────────
 const btnNav = {
   background: 'linear-gradient(145deg, #43a047, #2e7d32)',
-  color: 'white', border: 'none', borderRadius: 10, fontWeight: 700,
-  cursor: 'pointer', padding: '6px 14px', fontSize: 13,
+  color: 'white', border: 'none', borderRadius: 8, fontWeight: 700,
+  cursor: 'pointer', padding: '4px 10px', fontSize: 12,
   boxShadow: '0 2px 5px rgba(46,125,50,0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
-  transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 4,
+  transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 3,
 };
 const btnNavDisabled = { ...btnNav, opacity: 0.35, cursor: 'not-allowed', boxShadow: 'none' };
 
@@ -129,9 +129,9 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
   const go = (q) => { onNavigate(q); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', borderTop: '1px solid #a5d6a7', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+    <div style={{ background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', borderTop: '1px solid #a5d6a7', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
       {/* 章導航 */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center' }}>
         <button
           disabled={!hasPrevChap}
           onClick={() => go(`${bookName} ${chapNum - 1}`)}
@@ -140,7 +140,7 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
         >
           ◀ 上一章
         </button>
-        <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 4px' }}>
           📖 {bookName} {chapNum} 章 {isSingleVerse ? `${secNum}節` : ''}
           {data.timeMs && <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 6, fontWeight: 500 }}>({data.timeMs}ms)</span>}
         </span>
@@ -155,21 +155,21 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
       </div>
       {/* 節導航 (only when single verse) */}
       {isSingleVerse && (
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center' }}>
           <button
             disabled={!hasPrevVerse}
             onClick={() => go(`${bookName} ${chapNum}:${secNum - 1}`)}
-            style={hasPrevVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 3px 8px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.15)' } : btnNavDisabled}
+            style={hasPrevVerse ? { ...btnNav, padding: '4px 10px', fontSize: 12, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 2px 5px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.15)' } : btnNavDisabled}
           >
             ◀ 上一節
           </button>
-          <span style={{ fontSize: 13, color: '#555', display: 'flex', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: '#555', display: 'flex', alignItems: 'center' }}>
             第 {secNum} / {totalVerses} 節
           </span>
           <button
             disabled={!hasNextVerse}
             onClick={() => go(`${bookName} ${chapNum}:${secNum + 1}`)}
-            style={hasNextVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 3px 8px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.15)' } : btnNavDisabled}
+            style={hasNextVerse ? { ...btnNav, padding: '4px 10px', fontSize: 12, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 2px 5px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.15)' } : btnNavDisabled}
           >
             下一節 ▶
           </button>
@@ -294,7 +294,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
         </button>
       </form>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-        {VERSIONS.map(v => (
+        {VERSIONS.filter(v => v.id !== 'web').map(v => (
           <label key={v.id} style={versions.includes(v.id) ? { ...S.pillActive, padding: '6px 16px', fontSize: 13 } : { ...S.pillInactive, padding: '6px 16px', fontSize: 13 }}>
             <input type="checkbox" style={{ display: 'none' }} checked={versions.includes(v.id)} onChange={() => handleVersionToggle(v.id)} />
             {v.label}
@@ -317,7 +317,7 @@ function FhlLink({ abbrev, chap, sec }) {
   if (!url) return null;
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛經文註釋" style={{ color: '#ffb300', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid #ffe082', borderRadius: '4px', backgroundColor: '#fff8e1', fontWeight: 600, transition: 'all 0.2s', display: 'inline-block' }} onMouseEnter={e => { e.target.style.backgroundColor = '#ffecb3'; e.target.style.color = '#e65100'; }} onMouseLeave={e => { e.target.style.backgroundColor = '#fff8e1'; e.target.style.color = '#ffb300'; }}>
-      [信望愛註釋]
+      [註釋]
     </a>
   );
 }
@@ -423,6 +423,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize }
                 >
                   第 {vNum} 節
                 </a>
+                <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
               </div>
               {results.map((res, i) => {
                 const vd = res.record?.find(r => r.sec == vNum);
@@ -442,7 +443,6 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize }
                       {vNum}
                     </a>
                     <span dangerouslySetInnerHTML={{ __html: text.replace(/<[^>]+>/g, '') }} />
-                    <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
                   </div>
                 );
               })}
@@ -569,6 +569,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize }) {
               <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
                 <input type="checkbox" checked={selected.has(vo.key)} onChange={() => toggleVerse(vo.key)} style={S.checkbox} />
                 <a onClick={(e) => { e.preventDefault(); goToChapter(vo.chineses, vo.chap); }} href="#" className="mobile-verse-label" style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${vo.chineses} 第 ${vo.chap} 章`}>{vo.chineses} {vo.chap}:{vo.sec}</a>
+                <FhlLink abbrev={bookMap.find(b => b.names[0] === vo.chineses)?.localAbbrev} chap={vo.chap} sec={vo.sec} />
               </div>
               {results.map((res, i) => {
                 const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
@@ -587,7 +588,6 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize }) {
                       {vo.chineses} {vo.chap}:{vo.sec}
                     </a>
                     {vd ? <HighlightText text={vd.bible_text.replace(/<[^>]+>/g, '')} keyword={keyword} /> : <span style={{ color: '#ccc' }}>--</span>}
-                    <FhlLink abbrev={bookMap.find(b => b.names[0] === vo.chineses)?.localAbbrev} chap={vo.chap} sec={vo.sec} />
                   </div>
                 );
               })}
