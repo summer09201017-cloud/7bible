@@ -29,7 +29,7 @@ const S = {
   pillInactive: { background: 'linear-gradient(145deg, #ffffff, #f5f5f5)', color: '#666', border: '1px solid #ccc', boxShadow: '0 2px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
   tableHeader: { background: 'linear-gradient(145deg, #e8f5e9, #c8e6c9)', borderBottom: '1px solid #a5d6a7' },
   actionBar: { background: 'linear-gradient(to right, #e8f5e9, #f1f8e9)', borderTop: '1px solid #c8e6c9' },
-  resultCard: { background: '#ffffff', boxShadow: '0 6px 20px rgba(76,175,80,0.08)', border: '1px solid #c8e6c9', borderRadius: '16px', overflow: 'hidden' },
+  resultCard: { background: '#ffffff', boxShadow: '0 6px 20px rgba(76,175,80,0.08)', borderTop: '1px solid #c8e6c9', borderBottom: '1px solid #c8e6c9', borderRadius: 0, overflow: 'hidden' },
   checkbox: { width: 18, height: 18, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0 },
   statsBar: { background: 'linear-gradient(135deg, #fff9c4, #f1f8e9)', borderBottom: '1px solid #c8e6c9' },
   select: { background: 'linear-gradient(145deg, #ffffff, #f9fff5)', border: '2px solid #a5d6a7', borderRadius: '10px', padding: '10px 14px', fontSize: 14, outline: 'none', color: '#1b5e20', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 120 },
@@ -240,7 +240,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
   }
 
   return (
-    <div style={{ ...S.card, padding: '72px 24px 24px', marginTop: -56, marginBottom: 0, borderRadius: 0, marginLeft: -16, marginRight: -16, boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', position: 'relative', zIndex: 5 }}>
+    <div style={{ ...S.card, padding: '72px 24px 24px', marginTop: -56, marginBottom: 0, borderRadius: 0, boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', position: 'relative', zIndex: 5 }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1b5e20', textAlign: 'center', marginBottom: 20, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
         📖 多譯本聖經查詢 <small style={{ fontSize: 13, color: '#66bb6a', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.4</small>
@@ -671,21 +671,19 @@ export default function App() {
   }, []);
 
   return (
-    <div style={{ ...S.bg, padding: '32px 16px', paddingTop: 56, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-      <div style={{ maxWidth: 1600, margin: '0 auto' }}>
-        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} />
-        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed />
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-          <InstallButton />
-        </div>
-        {error && <div style={{ background: 'linear-gradient(145deg, #ffebee, #ffcdd2)', border: '1px solid #ef9a9a', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: '#c62828' }}>⚠️ {error}</div>}
-        {loading && <div style={{ textAlign: 'center', color: '#2e7d32', padding: '64px 0', fontSize: 18, fontWeight: 600 }}>⏳ 搜尋中，請稍候…</div>}
-        {!loading && data && data.mode === 'verse' && <VerseViewer data={data} bibleStructure={bibleStructure} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} setFontSize={setFontSize} />}
-        {!loading && data && data.mode === 'keyword' && <KeywordViewer data={data} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} setFontSize={setFontSize} />}
-        <footer style={{ marginTop: 48, textAlign: 'center', color: '#81c784', fontSize: 12, paddingBottom: 32 }}>
-          資料來源：信望愛 (FHL) 聖經 ・ 本機 JSON ・ 8 種譯本離線可用
-        </footer>
+    <div style={{ ...S.bg, padding: 0, paddingTop: 56, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+      <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} />
+      <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed />
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24, padding: '0 16px' }}>
+        <InstallButton />
       </div>
+      {error && <div style={{ background: 'linear-gradient(145deg, #ffebee, #ffcdd2)', border: '1px solid #ef9a9a', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: '#c62828' }}>⚠️ {error}</div>}
+      {loading && <div style={{ textAlign: 'center', color: '#2e7d32', padding: '64px 0', fontSize: 18, fontWeight: 600 }}>⏳ 搜尋中，請稍候…</div>}
+      {!loading && data && data.mode === 'verse' && <VerseViewer data={data} bibleStructure={bibleStructure} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} setFontSize={setFontSize} />}
+      {!loading && data && data.mode === 'keyword' && <KeywordViewer data={data} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} setFontSize={setFontSize} />}
+      <footer style={{ marginTop: 48, textAlign: 'center', color: '#81c784', fontSize: 12, padding: '0 16px' }}>
+        資料來源：信望愛 (FHL) 聖經 ・ 本機 JSON ・ 8 種譯本離線可用
+      </footer>
     </div>
   );
 }
