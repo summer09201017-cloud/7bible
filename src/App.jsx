@@ -1,456 +1,738 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { fetchBible, VERSIONS } from './api';
 import { bookMap } from './bible_books';
 
-// ─── Per-version text colors ─────────────────────────────────────────────────
 const VERSION_COLORS = {
-  unv: '#1a5276',   // 深藍 — 和合本
-  niv: '#0277bd',   // 深天藍 — NIV
-  esv: '#7b241c',   // 深紅 — ESV
-  web: '#1e8449',   // 深綠 — WEB
-  ncv: '#6c3483',   // 紫色 — 新譯本
-  lzz: '#b9770e',   // 金棕 — 呂振中
-  asv: '#2471a3',   // 鋼藍 — ASV
-  kjv: '#a04000',   // 橘棕 — KJV
+  unv: '#1a5276',
+  niv: '#0277bd',
+  esv: '#7b241c',
+  web: '#1e8449',
+  ncv: '#6c3483',
+  lzz: '#b9770e',
+  asv: '#2471a3',
+  kjv: '#a04000',
 };
 
-// ─── Reusable styles ─────────────────────────────────────────────────────────
+const HIGHLIGHT_COLORS = [
+  { id: '', label: '無', color: '#ffffff' },
+  { id: '#fff3a3', label: '黃', color: '#fff3a3' },
+  { id: '#d9f99d', label: '綠', color: '#d9f99d' },
+  { id: '#bfdbfe', label: '藍', color: '#bfdbfe' },
+  { id: '#fbcfe8', label: '粉', color: '#fbcfe8' },
+  { id: '#ddd6fe', label: '紫', color: '#ddd6fe' },
+];
+
+const LS_KEYS = {
+  history: 'bible-tool-history-v1',
+  annotations: 'bible-tool-annotations-v1',
+  versions: 'bible-tool-versions-v1',
+  fontSize: 'bible-tool-font-size-v1',
+  diffEnabled: 'bible-tool-diff-enabled-v1',
+};
+
+const FHL_ENGS_BY_LOCAL = {
+  gn: 'Gen', ex: 'Ex', lv: 'Lev', nm: 'Num', dt: 'Deut',
+  js: 'Josh', jud: 'Judg', rt: 'Ruth', '1sm': '1 Sam', '2sm': '2 Sam',
+  '1kgs': '1 Kin', '2kgs': '2 Kin', '1chr': '1 Chr', '2chr': '2 Chr',
+  ezr: 'Ezra', ne: 'Neh', es: 'Esth', job: 'Job', ps: 'Ps',
+  prv: 'Prov', ec: 'Eccl', so: 'Song', is: 'Is', jr: 'Jer',
+  lm: 'Lam', ez: 'Ezek', dn: 'Dan', ho: 'Hos', jl: 'Joel',
+  am: 'Amos', ob: 'Obad', jn: 'Jon', mi: 'Mic', na: 'Nah',
+  hab: 'Hab', zp: 'Zeph', hg: 'Hag', zc: 'Zech', ml: 'Mal',
+  mt: 'Matt', mk: 'Mark', lk: 'Luke', jo: 'John', act: 'Acts',
+  rm: 'Rom', '1co': '1 Cor', '2co': '2 Cor', gl: 'Gal', eph: 'Eph',
+  ph: 'Phil', cl: 'Col', '1ts': '1 Thess', '2ts': '2 Thess',
+  '1tm': '1 Tim', '2tm': '2 Tim', tt: 'Titus', phm: 'Philem',
+  hb: 'Heb', jm: 'James', '1pe': '1 Pet', '2pe': '2 Pet',
+  '1jo': '1 John', '2jo': '2 John', '3jo': '3 John', jd: 'Jude', re: 'Rev',
+};
+
 const S = {
-  bg: { background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e0f2e1 100%)', minHeight: '100vh' },
-  card: { background: 'linear-gradient(145deg, #ffffff, #f1f8e9)', boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #c8e6c9', borderRadius: '16px' },
-  input: { background: 'linear-gradient(145deg, #ffffff, #f9fff5)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05), 0 1px 0 rgba(255,255,255,0.9)', border: '2px solid #a5d6a7', borderRadius: '12px' },
-  btnSearch: { background: 'linear-gradient(145deg, #e53935, #b71c1c)', boxShadow: '0 4px 8px rgba(183,28,28,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', width: '100%' },
-  btnCopy: { background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 3px 6px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
-  btnCopied: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', boxShadow: '0 3px 6px rgba(46,125,50,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
-  btnLine: { background: 'linear-gradient(145deg, #4caf50, #1b5e20)', boxShadow: '0 3px 6px rgba(27,94,32,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
-  btnEmail: { background: 'linear-gradient(145deg, #ff9800, #e65100)', boxShadow: '0 3px 6px rgba(230,81,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
-  btnInstall: { background: 'linear-gradient(145deg, #7c4dff, #4527a0)', boxShadow: '0 4px 8px rgba(69,39,160,0.3), inset 0 1px 0 rgba(255,255,255,0.2)', borderRadius: '12px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
-  pillActive: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', color: 'white', border: '1px solid #2e7d32', boxShadow: '0 3px 8px rgba(46,125,50,0.3), inset 0 1px 0 rgba(255,255,255,0.15)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
-  pillInactive: { background: 'linear-gradient(145deg, #ffffff, #f5f5f5)', color: '#666', border: '1px solid #ccc', boxShadow: '0 2px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
+  bg: { background: 'linear-gradient(135deg, #e8f5e9 0%, #f7fbef 50%, #e0f2e1 100%)', minHeight: '100vh' },
+  card: { background: 'linear-gradient(145deg, #ffffff, #f7fbef)', boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #c8e6c9', borderRadius: '14px' },
+  input: { background: '#ffffff', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)', border: '2px solid #a5d6a7', borderRadius: '10px' },
+  btnSearch: { background: 'linear-gradient(145deg, #d32f2f, #9f1c1c)', boxShadow: '0 4px 8px rgba(183,28,28,0.25)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', width: '100%' },
+  btnCopy: { background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 3px 6px rgba(13,71,161,0.25)', borderRadius: '9px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  btnCopied: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', boxShadow: '0 3px 6px rgba(46,125,50,0.25)', borderRadius: '9px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  btnLine: { background: 'linear-gradient(145deg, #4caf50, #1b5e20)', boxShadow: '0 3px 6px rgba(27,94,32,0.25)', borderRadius: '9px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  btnEmail: { background: 'linear-gradient(145deg, #fb8c00, #e65100)', boxShadow: '0 3px 6px rgba(230,81,0,0.25)', borderRadius: '9px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  btnInstall: { background: 'linear-gradient(145deg, #6d4cff, #4527a0)', boxShadow: '0 4px 8px rgba(69,39,160,0.25)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
+  pillActive: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', color: 'white', border: '1px solid #2e7d32', boxShadow: '0 3px 8px rgba(46,125,50,0.25)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
+  pillInactive: { background: '#ffffff', color: '#555', border: '1px solid #cfd8dc', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
   tableHeader: { background: 'linear-gradient(145deg, #e8f5e9, #c8e6c9)', borderBottom: '1px solid #a5d6a7' },
-  actionBar: { background: 'linear-gradient(to right, #e8f5e9, #f1f8e9)', borderTop: '1px solid #c8e6c9' },
+  actionBar: { background: 'linear-gradient(to right, #e8f5e9, #f7fbef)', borderTop: '1px solid #c8e6c9' },
   resultCard: { background: '#ffffff', boxShadow: '0 6px 20px rgba(76,175,80,0.08)', borderTop: '1px solid #c8e6c9', borderBottom: '1px solid #c8e6c9', borderRadius: 0, overflow: 'hidden' },
   checkbox: { width: 18, height: 18, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0 },
   statsBar: { background: 'linear-gradient(135deg, #fff9c4, #f1f8e9)', borderBottom: '1px solid #c8e6c9' },
-  select: { background: 'linear-gradient(145deg, #ffffff, #f9fff5)', border: '2px solid #a5d6a7', borderRadius: '10px', padding: '10px 14px', fontSize: 14, outline: 'none', color: '#1b5e20', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 120 },
+  select: { background: '#ffffff', border: '2px solid #a5d6a7', borderRadius: '9px', padding: '10px 12px', fontSize: 14, outline: 'none', color: '#1b5e20', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 130 },
+  smallBtn: { border: '1px solid #a5d6a7', background: '#ffffff', color: '#1b5e20', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  dangerBtn: { border: '1px solid #ef9a9a', background: '#ffebee', color: '#b71c1c', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  textarea: { width: '100%', minHeight: 72, resize: 'vertical', border: '1px solid #a5d6a7', borderRadius: 8, padding: 8, fontSize: 13, lineHeight: 1.5, outline: 'none' },
 };
 
-// ─── Highlight helper ────────────────────────────────────────────────────────
-function HighlightText({ text, keyword }) {
-  if (!keyword || !text) return <span>{text || '--'}</span>;
-  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+function readStorage(key, fallback) {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function usePersistentState(key, fallback) {
+  const [value, setValue] = useState(() => readStorage(key, fallback));
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Cannot save ${key}`, error);
+    }
+  }, [key, value]);
+  return [value, setValue];
+}
+
+function stripTags(text) {
+  return String(text || '').replace(/<[^>]+>/g, '');
+}
+
+function getBookName(localAbbrev, longName = false) {
+  const entry = bookMap.find((b) => b.localAbbrev === localAbbrev);
+  return entry ? entry.names[longName ? 1 : 0] : localAbbrev;
+}
+
+function getVerseKey(ref) {
+  return `${ref.abbrev}:${ref.chap}:${ref.sec}`;
+}
+
+function makeReference(abbrev, chap, sec) {
+  const bEntry = bookMap.find((b) => b.localAbbrev === abbrev);
+  const bookName = bEntry ? bEntry.names[0] : abbrev;
+  return {
+    abbrev,
+    chap: Number(chap),
+    sec: Number(sec),
+    label: `${bookName} ${chap}:${sec}`,
+    bookName,
+  };
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatVersesForShare(selectedVerses) {
+  if (!selectedVerses || selectedVerses.length === 0) return '';
+  return selectedVerses.map((v) => `${v.ref}\n${v.text}`).join('\n\n');
+}
+
+function shareToLine(text) {
+  window.open(`https://social-plugins.line.me/lineit/share?url=&text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function shareToEmail(text) {
+  window.location.href = `mailto:?subject=${encodeURIComponent('聖經經文分享')}&body=${encodeURIComponent(text)}`;
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return true;
+  }
+}
+
+function softColor(color) {
+  if (!color) return 'transparent';
+  return `linear-gradient(90deg, ${color} 0%, ${color}99 45%, transparent 100%)`;
+}
+
+function getTextKind(text) {
+  const cjk = (String(text).match(/[\u4e00-\u9fff]/g) || []).length;
+  const latin = (String(text).match(/[A-Za-z]/g) || []).length;
+  return cjk >= latin ? 'cjk' : 'latin';
+}
+
+function buildDiffContext(current, compareText) {
+  if (!compareText || !current || stripTags(compareText) === current) return null;
+  const currentKind = getTextKind(current);
+  const compare = stripTags(compareText);
+  if (currentKind !== getTextKind(compare)) return null;
+
+  const tokens = currentKind === 'cjk'
+    ? Array.from(compare).filter((ch) => /[\u4e00-\u9fff]/.test(ch))
+    : (compare.toLowerCase().match(/[A-Za-z']{3,}/g) || []);
+
+  return { kind: currentKind, set: new Set(tokens) };
+}
+
+function isDiffToken(token, diffContext) {
+  if (!diffContext) return false;
+  if (diffContext.kind === 'cjk') return /[\u4e00-\u9fff]/.test(token) && !diffContext.set.has(token);
+  return /^[A-Za-z']{3,}$/.test(token) && !diffContext.set.has(token.toLowerCase());
+}
+
+function VerseText({ text, keyword, compareText }) {
+  const cleanText = stripTags(text);
+  const escapedKeyword = keyword ? keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
+  const keywordRegex = escapedKeyword ? new RegExp(`(${escapedKeyword})`, 'gi') : null;
+  const diffContext = useMemo(() => buildDiffContext(cleanText, compareText), [cleanText, compareText]);
+
+  const renderPlainPart = (part, keyPrefix) => {
+    const pieces = diffContext?.kind === 'cjk' ? Array.from(part) : part.split(/([A-Za-z']+)/g);
+    return pieces.map((piece, index) => {
+      if (!piece) return null;
+      if (!isDiffToken(piece, diffContext)) return <span key={`${keyPrefix}-${index}`}>{piece}</span>;
+      return (
+        <span key={`${keyPrefix}-${index}`} style={{ background: '#e0f2fe', borderBottom: '2px solid #0284c7', borderRadius: 3, padding: '0 1px' }}>
+          {piece}
+        </span>
+      );
+    });
+  };
+
+  if (!keywordRegex) return <span>{renderPlainPart(cleanText, 'plain')}</span>;
+
   return (
     <span>
-      {parts.map((part, i) =>
-        part.toLowerCase() === keyword.toLowerCase()
-          ? <mark key={i} style={{ background: '#fef08a', color: '#854d0e', borderRadius: 3, padding: '0 2px' }}>{part}</mark>
-          : part
-      )}
+      {cleanText.split(keywordRegex).map((part, index) => {
+        if (!part) return null;
+        if (part.toLowerCase() === keyword.toLowerCase()) {
+          return <mark key={`kw-${index}`} style={{ background: '#fef08a', color: '#854d0e', borderRadius: 3, padding: '0 2px' }}>{part}</mark>;
+        }
+        return <span key={`part-${index}`}>{renderPlainPart(part, `part-${index}`)}</span>;
+      })}
     </span>
   );
 }
 
-// ─── Share / Copy helpers ────────────────────────────────────────────────────
-function formatVersesForShare(selectedVerses) {
-  if (!selectedVerses || selectedVerses.length === 0) return '';
-  return selectedVerses.map(v => `${v.ref}\n${v.text}`).join('\n\n');
-}
-function shareToLine(text) {
-  window.open(`https://social-plugins.line.me/lineit/share?url=&text=${encodeURIComponent(text)}`, '_blank');
-}
-function shareToEmail(text) {
-  window.location.href = `mailto:?subject=${encodeURIComponent('聖經經文分享')}&body=${encodeURIComponent(text)}`;
-}
-async function copyToClipboard(text) {
-  try { await navigator.clipboard.writeText(text); return true; }
-  catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); return true; }
-}
-
-// ─── ActionBar ───────────────────────────────────────────────────────────────
-function ActionBar({ getSelectedText, selectedCount, large, isTop }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
-    const text = getSelectedText(); if (!text) return;
-    await copyToClipboard(text); setCopied(true); setTimeout(() => setCopied(false), 2000);
-  };
-  const disabled = selectedCount === 0;
-  const disabledStyle = disabled ? { opacity: 0.4, cursor: 'not-allowed' } : {};
-  const sz = large ? { padding: '16px 24px', fontSize: 20, minWidth: '250px', flexGrow: 1, justifyContent: 'center' } : { padding: '6px 14px', fontSize: 12 };
-  const shareSz = large ? { padding: '12px 20px', fontSize: 16 } : { padding: '6px 14px', fontSize: 12 };
-  return (
-    <div style={{ ...S.actionBar, padding: '16px', position: 'sticky', bottom: isTop ? 'auto' : 0, top: isTop ? 44 : 'auto', zIndex: 9, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-      <span style={{ fontSize: large ? 16 : 12, color: '#555', marginRight: 4, whiteSpace: 'nowrap' }}>
-        已選 <strong style={{ color: '#2e7d32' }}>{selectedCount}</strong> 節
-      </span>
-      <button onClick={handleCopy} disabled={disabled} className="btn-active-effect" style={{ ...(copied ? S.btnCopied : S.btnCopy), ...disabledStyle, ...sz, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-        {copied ? '✅ 已複製' : '📋 複製經文'}
-      </button>
-      <button onClick={() => shareToLine(getSelectedText())} disabled={disabled} className="btn-active-effect" style={{ ...S.btnLine, ...disabledStyle, ...shareSz, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-        💬 分享到 Line
-      </button>
-      <button onClick={() => shareToEmail(getSelectedText())} disabled={disabled} className="btn-active-effect" style={{ ...S.btnEmail, ...disabledStyle, ...shareSz, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-        ✉️ Email 分享
-      </button>
-    </div>
-  );
-}
-
-// ─── ChapterNavBar ───────────────────────────────────────────────────────────
-const btnNav = {
-  background: 'linear-gradient(145deg, #43a047, #2e7d32)',
-  color: 'white', border: 'none', borderRadius: 8, fontWeight: 700,
-  cursor: 'pointer', padding: '4px 10px', fontSize: 12,
-  boxShadow: '0 2px 5px rgba(46,125,50,0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
-  transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 3,
-};
-const btnNavDisabled = { ...btnNav, opacity: 0.35, cursor: 'not-allowed', boxShadow: 'none' };
-
-function ChapterNavBar({ data, bibleStructure, onNavigate }) {
-  if (!data || !bibleStructure || !onNavigate) return null;
-  const { abbrev, chap, sec } = data;
-  const chapNum = parseInt(chap);
-  const bookData = bibleStructure.find(b => b.abbrev === abbrev);
-  if (!bookData) return null;
-  const totalChaps = bookData.chapters.length;
-  const bInfo = bookMap.find(b => b.localAbbrev === abbrev);
-  const bookName = bInfo ? bInfo.names[0] : abbrev;
-
-  const hasPrevChap = chapNum > 1;
-  const hasNextChap = chapNum < totalChaps;
-
-  // 單節導航 (only when viewing a specific verse)
-  const isSingleVerse = sec && !sec.includes('-');
-  const secNum = isSingleVerse ? parseInt(sec) : 0;
-  const totalVerses = bookData.chapters[chapNum - 1]?.length || 0;
-  const hasPrevVerse = isSingleVerse && secNum > 1;
-  const hasNextVerse = isSingleVerse && secNum < totalVerses;
-
-  const go = (q) => { onNavigate(q); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-
-  return (
-    <div style={{ background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', borderTop: '1px solid #a5d6a7', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-      {/* 章導航 */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center' }}>
-        <button
-          disabled={!hasPrevChap}
-          onClick={() => go(`${bookName} ${chapNum - 1}`)}
-          className="btn-active-effect"
-          style={hasPrevChap ? btnNav : btnNavDisabled}
-        >
-          ◀ 上一章
-        </button>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 4px' }}>
-          📖 {bookName} {chapNum} 章 {isSingleVerse ? `${secNum}節` : ''}
-          {data.timeMs && <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 6, fontWeight: 500 }}>({data.timeMs}ms)</span>}
-        </span>
-        <button
-          disabled={!hasNextChap}
-          onClick={() => go(`${bookName} ${chapNum + 1}`)}
-          className="btn-active-effect"
-          style={hasNextChap ? btnNav : btnNavDisabled}
-        >
-          下一章 ▶
-        </button>
-      </div>
-      {/* 節導航 (only when single verse) */}
-      {isSingleVerse && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center' }}>
-          <button
-            disabled={!hasPrevVerse}
-            onClick={() => go(`${bookName} ${chapNum}:${secNum - 1}`)}
-            style={hasPrevVerse ? { ...btnNav, padding: '4px 10px', fontSize: 12, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 2px 5px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.15)' } : btnNavDisabled}
-          >
-            ◀ 上一節
-          </button>
-          <span style={{ fontSize: 11, color: '#555', display: 'flex', alignItems: 'center' }}>
-            第 {secNum} / {totalVerses} 節
-          </span>
-          <button
-            disabled={!hasNextVerse}
-            onClick={() => go(`${bookName} ${chapNum}:${secNum + 1}`)}
-            style={hasNextVerse ? { ...btnNav, padding: '4px 10px', fontSize: 12, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 2px 5px rgba(13,71,161,0.3), inset 0 1px 0 rgba(255,255,255,0.15)' } : btnNavDisabled}
-          >
-            下一節 ▶
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── SearchBar ───────────────────────────────────────────────────────────────
-function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure }) {
-  const [query, setQuery] = useState('');
-  const [selBook, setSelBook] = useState('');
-  const [selChap, setSelChap] = useState('');
-  const [selVerse, setSelVerse] = useState('');
-  const [selEndVerse, setSelEndVerse] = useState('');
-
-  useEffect(() => {
-    if (selBook) {
-      const bInfo = bookMap.find(b => b.localAbbrev === selBook);
-      const bName = bInfo ? bInfo.names[0] : selBook;
-      let q = bName;
-      if (selChap) {
-        q += ` ${selChap}`;
-        if (selVerse) {
-          q += `:${selVerse}`;
-          if (selEndVerse) {
-            q += `-${selEndVerse}`;
-          }
-        }
-      }
-      setQuery(q);
-    }
-  }, [selBook, selChap, selVerse, selEndVerse]);
-
-  // 自動搜尋與 Debounce 機制
-  useEffect(() => {
-    const q = query.trim();
-    // 只在 >=2 字元時自動查詢
-    if (q.length < 2) return;
-
-    // 第 2 個字時 debounce 0, 第 3 個字以上 120ms
-    const delay = q.length === 2 ? 0 : 120;
-
-    const timeout = setTimeout(() => {
-      onSearch(q, versions);
-    }, delay);
-
-    return () => clearTimeout(timeout);
-  }, [query, versions, onSearch]);
-
-  const handleSubmit = (e) => { e.preventDefault(); if (query.trim()) onSearch(query, versions); };
-  const handleVersionToggle = (vId) => {
-    if (versions.includes(vId)) { if (versions.length > 1) setVersions(versions.filter(v => v !== vId)); }
-    else { const nv = [...versions, vId]; nv.sort((a, b) => VERSIONS.findIndex(v => v.id === a) - VERSIONS.findIndex(v => v.id === b)); setVersions(nv); }
-  };
-
-  let chaptersCount = 0;
-  let versesCount = 0;
-  if (bibleStructure && selBook) {
-    const bookData = bibleStructure.find(b => b.abbrev === selBook);
-    if (bookData) {
-      chaptersCount = bookData.chapters.length;
-      if (selChap && parseInt(selChap) <= chaptersCount) {
-        versesCount = bookData.chapters[parseInt(selChap) - 1].length;
-      }
-    }
-  }
-
-  return (
-    <div style={{ ...S.card, padding: '72px 24px 24px', marginTop: -56, marginBottom: 0, borderRadius: 0, boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', position: 'relative', zIndex: 5 }}>
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1b5e20', textAlign: 'center', marginBottom: 20, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-        📖 多譯本聖經查詢 <small style={{ fontSize: 13, color: '#66bb6a', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.4</small>
-      </h1>
-
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
-        <input type="text" value={query} onChange={(e) => {
-          setQuery(e.target.value);
-          if (selBook) { setSelBook(''); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }
-        }}
-          placeholder="關鍵字或書卷章節 (例如：愛心、創 1、John 3:16)"
-          style={{ ...S.input, width: '100%', padding: '14px 18px', fontSize: 16, outline: 'none', color: '#333' }}
-          onFocus={(e) => e.target.style.borderColor = '#43a047'}
-          onBlur={(e) => e.target.style.borderColor = '#a5d6a7'}
-        />
-
-        {/* Book / Chapter / Verse Selectors */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }} style={S.select}>
-            <option value="">📖 選擇書卷</option>
-            {bibleStructure && bibleStructure.map(b => {
-              const bInfo = bookMap.find(bm => bm.localAbbrev === b.abbrev);
-              return <option key={b.abbrev} value={b.abbrev}>{bInfo ? bInfo.names[1] : b.name}</option>;
-            })}
-          </select>
-
-          <select value={selChap} onChange={(e) => { setSelChap(e.target.value); setSelVerse(''); setSelEndVerse(''); }} disabled={!selBook} style={{ ...S.select, opacity: selBook ? 1 : 0.5 }}>
-            <option value="">🔖 章</option>
-            {chaptersCount > 0 && Array.from({ length: chaptersCount }, (_, i) => (
-              <option key={i + 1} value={i + 1}>{i + 1} 章</option>
-            ))}
-          </select>
-
-          <select value={selVerse} onChange={(e) => { setSelVerse(e.target.value); setSelEndVerse(''); }} disabled={!selChap} style={{ ...S.select, opacity: selChap ? 1 : 0.5 }}>
-            <option value="">📍 節</option>
-            {versesCount > 0 && Array.from({ length: versesCount }, (_, i) => (
-              <option key={i + 1} value={i + 1}>{i + 1} 節</option>
-            ))}
-          </select>
-
-          <select value={selEndVerse} onChange={(e) => setSelEndVerse(e.target.value)} disabled={!selVerse} style={{ ...S.select, opacity: selVerse ? 1 : 0.5 }}>
-            <option value="">🏁 至哪節</option>
-            {versesCount > 0 && selVerse && Array.from({ length: versesCount - parseInt(selVerse) }, (_, i) => {
-              const verseNum = parseInt(selVerse) + i + 1;
-              return <option key={verseNum} value={verseNum}>{verseNum} 節</option>;
-            })}
-          </select>
-        </div>
-
-        <button type="submit" disabled={isLoading} className="btn-active-effect" style={{ ...S.btnSearch, padding: '16px 0', fontSize: 20 }}>
-          {isLoading ? '⏳ 查詢中...' : '🔍 查詢'}
-        </button>
-      </form>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-        {VERSIONS.filter(v => v.id !== 'web').map(v => (
-          <label key={v.id} style={versions.includes(v.id) ? { ...S.pillActive, padding: '6px 16px', fontSize: 13 } : { ...S.pillInactive, padding: '6px 16px', fontSize: 13 }}>
-            <input type="checkbox" style={{ display: 'none' }} checked={versions.includes(v.id)} onChange={() => handleVersionToggle(v.id)} />
-            {v.label}
-          </label>
-        ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── FHL commentary link helper ──────────────────────────────────────────────
 function getFhlCommentaryUrl(abbrev, chap, sec) {
-  const bEntry = bookMap.find(b => b.localAbbrev === abbrev);
-  if (!bEntry) return null;
-  return `https://bible.fhl.net/new/com.php?book=3&engs=${bEntry.engs}&chap=${chap}&sec=${sec}`;
+  const fhlEngs = FHL_ENGS_BY_LOCAL[abbrev];
+  if (!fhlEngs) return null;
+  const params = new URLSearchParams({
+    chineses: fhlEngs,
+    chap: String(chap),
+    sec: String(sec),
+    strongflag: '1',
+    TABFLAG: '1',
+  });
+  return `https://bible.fhl.net/new/read.php?${params.toString()}`;
 }
 
 function FhlLink({ abbrev, chap, sec }) {
   const url = getFhlCommentaryUrl(abbrev, chap, sec);
   if (!url) return null;
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛經文註釋" style={{ color: '#ffb300', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid #ffe082', borderRadius: '4px', backgroundColor: '#fff8e1', fontWeight: 600, transition: 'all 0.2s', display: 'inline-block' }} onMouseEnter={e => { e.target.style.backgroundColor = '#ffecb3'; e.target.style.color = '#e65100'; }} onMouseLeave={e => { e.target.style.backgroundColor = '#fff8e1'; e.target.style.color = '#ffb300'; }}>
-      [註釋]
+    <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛閱讀頁與註釋欄" style={{ color: '#b45309', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid #fcd34d', borderRadius: 5, backgroundColor: '#fffbeb', fontWeight: 700, display: 'inline-block' }}>
+      註釋
     </a>
   );
 }
 
-// ─── Font size control ───────────────────────────────────────────────────────
-const btnFontSize = {
-  background: 'linear-gradient(145deg, #ffffff, #f5f5f5)',
-  border: '2px solid #a5d6a7',
-  borderRadius: '10px',
-  color: '#1b5e20',
+function ActionBar({ getSelectedText, selectedCount, large, isTop }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    const text = getSelectedText();
+    if (!text) return;
+    await copyToClipboard(text);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  };
+  const disabled = selectedCount === 0;
+  const disabledStyle = disabled ? { opacity: 0.4, cursor: 'not-allowed' } : {};
+  const copySize = large ? { padding: '14px 20px', fontSize: 18, minWidth: 220, flexGrow: 1, justifyContent: 'center' } : { padding: '6px 14px', fontSize: 12 };
+  const shareSize = large ? { padding: '10px 18px', fontSize: 15 } : { padding: '6px 14px', fontSize: 12 };
+
+  return (
+    <div style={{ ...S.actionBar, padding: '14px 16px', position: 'sticky', bottom: isTop ? 'auto' : 0, top: isTop ? 44 : 'auto', zIndex: 9, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: large ? 15 : 12, color: '#555', marginRight: 4, whiteSpace: 'nowrap' }}>
+        已選 <strong style={{ color: '#2e7d32' }}>{selectedCount}</strong> 節
+      </span>
+      <button type="button" onClick={handleCopy} disabled={disabled} className="btn-active-effect" style={{ ...(copied ? S.btnCopied : S.btnCopy), ...disabledStyle, ...copySize, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        {copied ? '已複製' : '複製經文'}
+      </button>
+      <button type="button" onClick={() => shareToLine(getSelectedText())} disabled={disabled} className="btn-active-effect" style={{ ...S.btnLine, ...disabledStyle, ...shareSize }}>
+        分享到 Line
+      </button>
+      <button type="button" onClick={() => shareToEmail(getSelectedText())} disabled={disabled} className="btn-active-effect" style={{ ...S.btnEmail, ...disabledStyle, ...shareSize }}>
+        Email 分享
+      </button>
+    </div>
+  );
+}
+
+const btnNav = {
+  background: 'linear-gradient(145deg, #43a047, #2e7d32)',
+  color: 'white',
+  border: 'none',
+  borderRadius: 9,
   fontWeight: 700,
   cursor: 'pointer',
   padding: '6px 14px',
-  fontSize: 15,
+  fontSize: 13,
+  boxShadow: '0 2px 5px rgba(46,125,50,0.2)',
   transition: 'all 0.15s',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+};
+const btnNavDisabled = { ...btnNav, opacity: 0.35, cursor: 'not-allowed', boxShadow: 'none' };
+
+function ChapterNavBar({ data, bibleStructure, onNavigate }) {
+  if (!data || !bibleStructure || !onNavigate) return null;
+  const { abbrev, chap, sec } = data;
+  const chapNum = parseInt(chap, 10);
+  const bookData = bibleStructure.find((b) => b.abbrev === abbrev);
+  if (!bookData) return null;
+  const totalChaps = bookData.chapters.length;
+  const bookName = getBookName(abbrev);
+  const hasPrevChap = chapNum > 1;
+  const hasNextChap = chapNum < totalChaps;
+  const isSingleVerse = sec && !sec.includes('-');
+  const secNum = isSingleVerse ? parseInt(sec, 10) : 0;
+  const totalVerses = bookData.chapters[chapNum - 1]?.length || 0;
+  const hasPrevVerse = isSingleVerse && secNum > 1;
+  const hasNextVerse = isSingleVerse && secNum < totalVerses;
+  const go = (q) => {
+    onNavigate(q);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', borderTop: '1px solid #a5d6a7', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button type="button" disabled={!hasPrevChap} onClick={() => go(`${bookName} ${chapNum - 1}`)} className="btn-active-effect" style={hasPrevChap ? btnNav : btnNavDisabled}>
+          上一章
+        </button>
+        <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+          {bookName} {chapNum} 章 {isSingleVerse ? `${secNum}節` : ''}
+          {data.timeMs && <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 6, fontWeight: 500 }}>({data.timeMs}ms)</span>}
+        </span>
+        <button type="button" disabled={!hasNextChap} onClick={() => go(`${bookName} ${chapNum + 1}`)} className="btn-active-effect" style={hasNextChap ? btnNav : btnNavDisabled}>
+          下一章
+        </button>
+      </div>
+      {isSingleVerse && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button type="button" disabled={!hasPrevVerse} onClick={() => go(`${bookName} ${chapNum}:${secNum - 1}`)} style={hasPrevVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)' } : btnNavDisabled}>
+            上一節
+          </button>
+          <span style={{ fontSize: 13, color: '#555', display: 'flex', alignItems: 'center' }}>第 {secNum} / {totalVerses} 節</span>
+          <button type="button" disabled={!hasNextVerse} onClick={() => go(`${bookName} ${chapNum}:${secNum + 1}`)} style={hasNextVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)' } : btnNavDisabled}>
+            下一節
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure }) {
+  const [query, setQuery] = useState('');
+  const [selBook, setSelBook] = useState('');
+  const [selChap, setSelChap] = useState('');
+  const [selVerse, setSelVerse] = useState('');
+  const [selEndVerse, setSelEndVerse] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [scope, setScope] = useState('all');
+  const [startBookIndex, setStartBookIndex] = useState(0);
+  const [endBookIndex, setEndBookIndex] = useState(65);
+  const [operator, setOperator] = useState('and');
+  const [exactPhrase, setExactPhrase] = useState(false);
+  const [exclude, setExclude] = useState('');
+  const [searchSelectedVersions, setSearchSelectedVersions] = useState(false);
+
+  const searchOptions = useMemo(() => ({
+    scope,
+    startBookIndex: Number(startBookIndex),
+    endBookIndex: Number(endBookIndex),
+    operator,
+    exactPhrase,
+    exclude: exclude.trim(),
+    searchSelectedVersions,
+  }), [scope, startBookIndex, endBookIndex, operator, exactPhrase, exclude, searchSelectedVersions]);
+
+  useEffect(() => {
+    if (!selBook) return;
+    const bName = getBookName(selBook);
+    let nextQuery = bName;
+    if (selChap) {
+      nextQuery += ` ${selChap}`;
+      if (selVerse) {
+        nextQuery += `:${selVerse}`;
+        if (selEndVerse) nextQuery += `-${selEndVerse}`;
+      }
+    }
+    setQuery(nextQuery);
+  }, [selBook, selChap, selVerse, selEndVerse]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return undefined;
+    const timeout = window.setTimeout(() => onSearch(q, versions, searchOptions), q.length === 2 ? 120 : 260);
+    return () => window.clearTimeout(timeout);
+  }, [query, versions, searchOptions, onSearch]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (query.trim()) onSearch(query, versions, searchOptions);
+  };
+
+  const handleVersionToggle = (versionId) => {
+    if (versions.includes(versionId)) {
+      if (versions.length > 1) setVersions(versions.filter((v) => v !== versionId));
+      return;
+    }
+    const nextVersions = [...versions, versionId].sort((a, b) => VERSIONS.findIndex((v) => v.id === a) - VERSIONS.findIndex((v) => v.id === b));
+    setVersions(nextVersions);
+  };
+
+  let chaptersCount = 0;
+  let versesCount = 0;
+  if (bibleStructure && selBook) {
+    const bookData = bibleStructure.find((b) => b.abbrev === selBook);
+    if (bookData) {
+      chaptersCount = bookData.chapters.length;
+      if (selChap && parseInt(selChap, 10) <= chaptersCount) versesCount = bookData.chapters[parseInt(selChap, 10) - 1].length;
+    }
+  }
+
+  return (
+    <div style={{ ...S.card, padding: '72px 24px 24px', marginTop: -56, marginBottom: 0, borderRadius: 0, position: 'relative', zIndex: 5 }}>
+      <div style={{ maxWidth: 980, margin: '0 auto' }}>
+      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1b5e20', textAlign: 'center', marginBottom: 18, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+        多譯本聖經查詢 <small style={{ fontSize: 13, color: '#66bb6a', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.5</small>
+      </h1>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 18 }}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (selBook) {
+              setSelBook('');
+              setSelChap('');
+              setSelVerse('');
+              setSelEndVerse('');
+            }
+          }}
+          placeholder="關鍵字或書卷章節，例如：愛心、創 1、John 3:16"
+          style={{ ...S.input, width: '100%', padding: '14px 18px', fontSize: 16, outline: 'none', color: '#333' }}
+          onFocus={(e) => { e.target.style.borderColor = '#43a047'; }}
+          onBlur={(e) => { e.target.style.borderColor = '#a5d6a7'; }}
+        />
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }} style={S.select}>
+            <option value="">選擇書卷</option>
+            {bibleStructure && bibleStructure.map((b) => {
+              const bInfo = bookMap.find((bm) => bm.localAbbrev === b.abbrev);
+              return <option key={b.abbrev} value={b.abbrev}>{bInfo ? bInfo.names[1] : b.name}</option>;
+            })}
+          </select>
+
+          <select value={selChap} onChange={(e) => { setSelChap(e.target.value); setSelVerse(''); setSelEndVerse(''); }} disabled={!selBook} style={{ ...S.select, opacity: selBook ? 1 : 0.5 }}>
+            <option value="">章</option>
+            {chaptersCount > 0 && Array.from({ length: chaptersCount }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1} 章</option>)}
+          </select>
+
+          <select value={selVerse} onChange={(e) => { setSelVerse(e.target.value); setSelEndVerse(''); }} disabled={!selChap} style={{ ...S.select, opacity: selChap ? 1 : 0.5 }}>
+            <option value="">節</option>
+            {versesCount > 0 && Array.from({ length: versesCount }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1} 節</option>)}
+          </select>
+
+          <select value={selEndVerse} onChange={(e) => setSelEndVerse(e.target.value)} disabled={!selVerse} style={{ ...S.select, opacity: selVerse ? 1 : 0.5 }}>
+            <option value="">至哪節</option>
+            {versesCount > 0 && selVerse && Array.from({ length: versesCount - parseInt(selVerse, 10) }, (_, i) => {
+              const verseNum = parseInt(selVerse, 10) + i + 1;
+              return <option key={verseNum} value={verseNum}>{verseNum} 節</option>;
+            })}
+          </select>
+        </div>
+
+        <button type="submit" disabled={isLoading} className="btn-active-effect" style={{ ...S.btnSearch, padding: '15px 0', fontSize: 19 }}>
+          {isLoading ? '查詢中...' : '查詢'}
+        </button>
+      </form>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
+        {VERSIONS.filter((v) => v.id !== 'web').map((v) => (
+          <label key={v.id} style={versions.includes(v.id) ? { ...S.pillActive, padding: '6px 16px', fontSize: 13 } : { ...S.pillInactive, padding: '6px 16px', fontSize: 13 }}>
+            <input type="checkbox" style={{ display: 'none' }} checked={versions.includes(v.id)} onChange={() => handleVersionToggle(v.id)} />
+            {v.label}
+          </label>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: showAdvanced ? 12 : 0 }}>
+        <button type="button" onClick={() => setShowAdvanced((v) => !v)} style={S.smallBtn}>
+          {showAdvanced ? '收合進階搜尋' : '進階搜尋'}
+        </button>
+      </div>
+
+      {showAdvanced && (
+        <div style={{ borderTop: '1px solid #c8e6c9', paddingTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+            搜尋範圍
+            <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ ...S.select, width: '100%' }}>
+              <option value="all">整本聖經</option>
+              <option value="ot">舊約</option>
+              <option value="nt">新約</option>
+              <option value="range">自訂書卷範圍</option>
+            </select>
+          </label>
+          {scope === 'range' && (
+            <>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+                起始書卷
+                <select value={startBookIndex} onChange={(e) => setStartBookIndex(Number(e.target.value))} style={{ ...S.select, width: '100%' }}>
+                  {bookMap.map((b, index) => <option key={b.localAbbrev} value={index}>{b.names[1]}</option>)}
+                </select>
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+                結束書卷
+                <select value={endBookIndex} onChange={(e) => setEndBookIndex(Number(e.target.value))} style={{ ...S.select, width: '100%' }}>
+                  {bookMap.map((b, index) => <option key={b.localAbbrev} value={index}>{b.names[1]}</option>)}
+                </select>
+              </label>
+            </>
+          )}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+            多字條件
+            <select value={operator} onChange={(e) => setOperator(e.target.value)} style={{ ...S.select, width: '100%' }}>
+              <option value="and">AND：全部都要包含</option>
+              <option value="or">OR：任一字即可</option>
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+            排除字詞
+            <input value={exclude} onChange={(e) => setExclude(e.target.value)} placeholder="例如：仇敵, 戰爭" style={{ ...S.input, padding: '10px 12px' }} />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', fontWeight: 700 }}>
+            <input type="checkbox" checked={exactPhrase} onChange={(e) => setExactPhrase(e.target.checked)} />
+            精確片語
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', fontWeight: 700 }}>
+            <input type="checkbox" checked={searchSelectedVersions} onChange={(e) => setSearchSelectedVersions(e.target.checked)} />
+            只搜尋已選譯本
+          </label>
+        </div>
+      )}
+      </div>
+    </div>
+  );
+}
+
+function AnnotationEditor({ reference, annotation, onChange }) {
+  const [open, setOpen] = useState(false);
+  const current = annotation || {};
+  const hasData = Boolean(current.favorite || current.note || current.color);
+
+  const update = (patch) => onChange(reference, patch);
+  const clear = () => onChange(reference, { note: '', color: '', favorite: false, clear: true });
+
+  return (
+    <div style={{ marginTop: 8, width: '100%' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button type="button" onClick={() => update({ favorite: !current.favorite })} style={{ ...S.smallBtn, background: current.favorite ? '#fff7ed' : '#fff', borderColor: current.favorite ? '#fdba74' : '#a5d6a7', color: current.favorite ? '#c2410c' : '#1b5e20' }}>
+          {current.favorite ? '已收藏' : '收藏'}
+        </button>
+        <button type="button" onClick={() => setOpen((v) => !v)} style={S.smallBtn}>
+          {current.note ? '編輯筆記' : '筆記'}
+        </button>
+        {hasData && <button type="button" onClick={clear} style={S.dangerBtn}>清除</button>}
+      </div>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 7 }}>
+        {HIGHLIGHT_COLORS.map((c) => (
+          <button
+            key={c.label}
+            type="button"
+            onClick={() => update({ color: c.id })}
+            title={`${c.label}螢光筆`}
+            style={{ width: 22, height: 22, borderRadius: 6, border: current.color === c.id ? '2px solid #166534' : '1px solid #94a3b8', background: c.color, cursor: 'pointer' }}
+          />
+        ))}
+      </div>
+      {open && (
+        <textarea
+          value={current.note || ''}
+          onChange={(e) => update({ note: e.target.value })}
+          placeholder="在這節旁寫筆記..."
+          style={{ ...S.textarea, marginTop: 8 }}
+        />
+      )}
+    </div>
+  );
+}
+
+const btnFontSize = {
+  background: '#ffffff',
+  border: '2px solid #a5d6a7',
+  borderRadius: 9,
+  color: '#1b5e20',
+  fontWeight: 700,
+  cursor: 'pointer',
+  padding: '6px 12px',
+  fontSize: 14,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   minWidth: 40,
 };
 
-function FontSizeControl({ fontSize, setFontSize, fixed }) {
+function FontSizeControl({ fontSize, setFontSize, fixed, diffEnabled, setDiffEnabled }) {
+  const content = (
+    <>
+      <span style={{ fontSize: 13, color: '#555', fontWeight: 700 }}>字型大小</span>
+      <button type="button" onClick={() => setFontSize((s) => Math.max(10, s - 1))} style={btnFontSize} title="縮小">A-</button>
+      <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
+      <button type="button" onClick={() => setFontSize((s) => Math.min(40, s + 1))} style={btnFontSize} title="放大">A+</button>
+      <button type="button" onClick={() => setFontSize(15)} style={{ ...btnFontSize, fontSize: 12, padding: '6px 10px' }} title="重置">重置</button>
+      {typeof diffEnabled === 'boolean' && (
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', fontWeight: 700 }}>
+          <input type="checkbox" checked={diffEnabled} onChange={(e) => setDiffEnabled(e.target.checked)} />
+          差異高亮
+        </label>
+      )}
+    </>
+  );
+
   if (fixed) {
     return (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e0f2e1 100%)', padding: '8px 16px', borderBottom: '2px solid #a5d6a7', boxShadow: '0 2px 12px rgba(76,175,80,0.25)' }}>
-        <span style={{ fontSize: 13, color: '#555', fontWeight: 600 }}>🔤 字型大小</span>
-        <button onClick={() => setFontSize(s => Math.max(10, s - 1))} style={btnFontSize} title="縮小">A-</button>
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#1b5e20', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
-        <button onClick={() => setFontSize(s => Math.min(40, s + 1))} style={btnFontSize} title="放大">A+</button>
-        <button onClick={() => setFontSize(15)} style={{ ...btnFontSize, fontSize: 12, padding: '6px 10px' }} title="重置">重置</button>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', background: 'linear-gradient(135deg, #e8f5e9 0%, #f7fbef 50%, #e0f2e1 100%)', padding: '8px 16px', borderBottom: '2px solid #a5d6a7', boxShadow: '0 2px 12px rgba(76,175,80,0.2)' }}>
+        {content}
       </div>
     );
   }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
-      <span style={{ fontSize: 13, color: '#555', fontWeight: 600 }}>🔤 字型大小</span>
-      <button onClick={() => setFontSize(s => Math.max(10, s - 1))} style={btnFontSize} title="縮小">A-</button>
-      <span style={{ fontSize: 14, fontWeight: 700, color: '#1b5e20', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
-      <button onClick={() => setFontSize(s => Math.min(40, s + 1))} style={btnFontSize} title="放大">A+</button>
-      <button onClick={() => setFontSize(15)} style={{ ...btnFontSize, fontSize: 12, padding: '6px 10px' }} title="重置">重置</button>
-    </div>
-  );
+
+  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>{content}</div>;
 }
 
-// ─── Verse mode viewer ───────────────────────────────────────────────────────
-function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize }) {
+function EmptyState({ text }) {
+  return <div style={{ textAlign: 'center', color: '#777', padding: '48px 0', ...S.resultCard }}>{text}</div>;
+}
+
+function getRecordForVerse(result, chap, sec, chineses) {
+  return result.record?.find((r) => r.sec === sec && (!chap || r.chap === chap) && (!chineses || r.chineses === chineses));
+}
+
+function getBaseTextForVerse(results, chap, sec, chineses) {
+  const record = results
+    .map((result) => getRecordForVerse(result, chap, sec, chineses))
+    .find((r) => r?.bible_text && r.bible_text !== '--');
+  return record ? record.bible_text : '';
+}
+
+function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled }) {
   const { results } = data;
   const [selected, setSelected] = useState(new Set());
-  const verseNums = new Set();
-  results.forEach(res => res.record?.forEach(r => verseNums.add(r.sec)));
-  const verses = Array.from(verseNums).sort((a, b) => a - b);
+  const verseNums = useMemo(() => {
+    const set = new Set();
+    results.forEach((res) => res.record?.forEach((r) => set.add(r.sec)));
+    return Array.from(set).sort((a, b) => a - b);
+  }, [results]);
   const cols = results.length;
-  const toggleVerse = (n) => { const s = new Set(selected); s.has(n) ? s.delete(n) : s.add(n); setSelected(s); };
-  const toggleAll = () => { selected.size === verses.length ? setSelected(new Set()) : setSelected(new Set(verses)); };
-  const getSelectedText = () => {
-    const lines = [];
-    for (const vNum of Array.from(selected).sort((a, b) => a - b)) {
-      results.forEach(res => {
-        const vi = VERSIONS.find(v => v.id === res.version); const vd = res.record?.find(r => r.sec == vNum);
-        if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${vNum}`, text: vd.bible_text.replace(/<[^>]+>/g, '') });
-      });
-    }
-    return formatVersesForShare(lines);
+  const bookName = getBookName(data.abbrev);
+
+  useEffect(() => setSelected(new Set()), [data]);
+
+  const toggleVerse = (n) => {
+    const next = new Set(selected);
+    next.has(n) ? next.delete(n) : next.add(n);
+    setSelected(next);
   };
+  const toggleAll = () => setSelected(selected.size === verseNums.length ? new Set() : new Set(verseNums));
+
+  const getSelectedText = useCallback(() => {
+    const lines = [];
+    Array.from(selected).sort((a, b) => a - b).forEach((vNum) => {
+      results.forEach((res) => {
+        const vi = VERSIONS.find((v) => v.id === res.version);
+        const vd = res.record?.find((r) => r.sec === vNum);
+        if (vd?.bible_text && vd.bible_text !== '--') {
+          lines.push({ ref: `[${vi?.label}] ${bookName} ${data.chap}:${vNum}`, text: stripTags(vd.bible_text) });
+        }
+      });
+    });
+    return formatVersesForShare(lines);
+  }, [selected, results, bookName, data.chap]);
 
   useEffect(() => {
     const handler = () => {
-      const txt = getSelectedText();
-      if (txt) { copyToClipboard(txt); alert('✅ 已複製勾選的經文！'); }
-      else { alert('⚠️ 請先勾選要複製的經文！'); }
+      const text = getSelectedText();
+      if (text) {
+        copyToClipboard(text);
+        window.alert('已複製勾選的經文');
+      } else {
+        window.alert('請先勾選要複製的經文');
+      }
     };
     document.addEventListener('global-copy', handler);
     return () => document.removeEventListener('global-copy', handler);
-  }, [selected, results]);
+  }, [getSelectedText]);
 
-  if (verses.length === 0) return <EmptyState text="找不到相關經文" />;
+  if (verseNums.length === 0) return <EmptyState text="找不到相關經文" />;
 
   return (
     <div style={S.resultCard}>
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
       <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large isTop />
-      <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} style={S.checkbox} />
+          <input type="checkbox" checked={selected.size === verseNums.length && verseNums.length > 0} onChange={toggleAll} style={S.checkbox} />
         </div>
-        {results.map((res, i) => {
-          const vi = VERSIONS.find(v => v.id === res.version);
-          return <div key={i} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || '#333', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
+        {results.map((res) => {
+          const vi = VERSIONS.find((v) => v.id === res.version);
+          return <div key={res.version} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || '#333', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
         })}
       </div>
       <div>
-        {verses.map(vNum => (
-          <div key={vNum} style={{ borderBottom: '1px solid #e8f5e9', background: selected.has(vNum) ? '#e8f5e930' : 'transparent', transition: 'background 0.15s' }}>
-            <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
-              <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
-                <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} style={S.checkbox} />
-                <a
-                  onClick={(e) => { e.preventDefault(); const bName = bookMap.find(b => b.localAbbrev === data.abbrev)?.names[0] || data.abbrev; onNavigate(`${bName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  href="#"
-                  className="mobile-verse-label"
-                  style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }}
-                  title={`跳到 ${data.chap} 章`}
-                >
-                  第 {vNum} 節
-                </a>
-                <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
-              </div>
-              {results.map((res, i) => {
-                const vd = res.record?.find(r => r.sec == vNum);
-                const text = vd?.bible_text || '--';
-                const vi = VERSIONS.find(v => v.id === res.version);
-                const col = VERSION_COLORS[res.version] || '#333';
-                return (
-                  <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: fontSize || 15 }}>
-                    <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
-                    <a
-                      onClick={(e) => { e.preventDefault(); const bName = bookMap.find(b => b.localAbbrev === data.abbrev)?.names[0] || data.abbrev; onNavigate(`${bName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                      href="#"
-                      className="desktop-verse-num"
-                      style={{ color: '#1565c0', fontSize: 13, fontWeight: 700, marginRight: 6, verticalAlign: 'top', textDecoration: 'underline', cursor: 'pointer' }}
-                      title={`跳到 ${data.chap} 章`}
-                    >
-                      {vNum}
+        {verseNums.map((vNum) => {
+          const reference = makeReference(data.abbrev, Number(data.chap), vNum);
+          const annotation = annotations[getVerseKey(reference)];
+          const baseText = getBaseTextForVerse(results, null, vNum, null);
+          const rowBackground = selected.has(vNum) ? '#e8f5e930' : softColor(annotation?.color);
+          return (
+            <div key={vNum} style={{ borderBottom: '1px solid #e8f5e9', background: rowBackground, transition: 'background 0.15s' }}>
+              <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
+                <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2, flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} style={S.checkbox} />
+                    <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="mobile-verse-label" style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
+                      第 {vNum} 節
                     </a>
-                    <span dangerouslySetInnerHTML={{ __html: text.replace(/<[^>]+>/g, '') }} />
+                    <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
                   </div>
-                );
-              })}
+                  <AnnotationEditor reference={reference} annotation={annotation} onChange={onAnnotationChange} />
+                </div>
+                {results.map((res) => {
+                  const vd = res.record?.find((r) => r.sec === vNum);
+                  const text = vd?.bible_text || '--';
+                  const vi = VERSIONS.find((v) => v.id === res.version);
+                  const col = VERSION_COLORS[res.version] || '#333';
+                  return (
+                    <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || 15 }}>
+                      <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
+                      <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="desktop-verse-num" style={{ color: '#1565c0', fontSize: 13, fontWeight: 700, marginRight: 6, verticalAlign: 'top', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
+                        {vNum}
+                      </a>
+                      <VerseText text={text} compareText={diffEnabled ? baseText : ''} />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
       <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large />
@@ -459,143 +741,152 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize }
   );
 }
 
-// ─── Keyword mode viewer ─────────────────────────────────────────────────────
-function KeywordViewer({ data, onNavigate, fontSize, setFontSize }) {
+function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled }) {
   const { results, keyword } = data;
   const [selected, setSelected] = useState(new Set());
   const [topCopied, setTopCopied] = useState(false);
-  const verseMap = new Map();
-  results.forEach(res => {
-    res.record?.forEach(r => {
-      const key = `${r.chineses}-${r.chap}-${r.sec}`;
-      if (!verseMap.has(key)) {
-        const bi = bookMap.findIndex(b => b.names[0] === r.chineses || b.names.includes(r.chineses));
-        verseMap.set(key, { key, chineses: r.chineses, chap: r.chap, sec: r.sec, bookIndex: bi >= 0 ? bi : 999 });
-      }
+  const verses = useMemo(() => {
+    const verseMap = new Map();
+    results.forEach((res) => {
+      res.record?.forEach((r) => {
+        const localAbbrev = r.localAbbrev || bookMap.find((b) => b.names[0] === r.chineses)?.localAbbrev;
+        if (!localAbbrev) return;
+        const key = `${localAbbrev}-${r.chap}-${r.sec}`;
+        if (!verseMap.has(key)) {
+          const bookIndex = bookMap.findIndex((b) => b.localAbbrev === localAbbrev);
+          verseMap.set(key, { key, chineses: r.chineses, localAbbrev, chap: r.chap, sec: r.sec, bookIndex: bookIndex >= 0 ? bookIndex : 999 });
+        }
+      });
     });
-  });
-  const verses = Array.from(verseMap.values()).sort((a, b) => a.bookIndex !== b.bookIndex ? a.bookIndex - b.bookIndex : a.chap !== b.chap ? a.chap - b.chap : a.sec - b.sec);
-  const totalCount = results.reduce((s, r) => s + (r.record?.length || 0), 0);
+    return Array.from(verseMap.values()).sort((a, b) => (a.bookIndex !== b.bookIndex ? a.bookIndex - b.bookIndex : a.chap !== b.chap ? a.chap - b.chap : a.sec - b.sec));
+  }, [results]);
+  const totalCount = results.reduce((sum, result) => sum + (Number.isInteger(result.matchedCount) ? result.matchedCount : (result.record?.length || 0)), 0);
   const cols = results.length;
-  const toggleVerse = (key) => { const s = new Set(selected); s.has(key) ? s.delete(key) : s.add(key); setSelected(s); };
-  const toggleAll = () => { selected.size === verses.length ? setSelected(new Set()) : setSelected(new Set(verses.map(v => v.key))); };
 
-  const getSelectedText = () => {
+  useEffect(() => setSelected(new Set()), [data]);
+
+  const toggleVerse = (key) => {
+    const next = new Set(selected);
+    next.has(key) ? next.delete(key) : next.add(key);
+    setSelected(next);
+  };
+  const toggleAll = () => setSelected(selected.size === verses.length ? new Set() : new Set(verses.map((v) => v.key)));
+
+  const getSelectedText = useCallback(() => {
     const lines = [];
     for (const vo of verses) {
       if (!selected.has(vo.key)) continue;
-      results.forEach(res => {
-        const vi = VERSIONS.find(v => v.id === res.version);
-        const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
-        if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${vo.chineses} ${vo.chap}:${vo.sec}`, text: vd.bible_text.replace(/<[^>]+>/g, '') });
+      results.forEach((res) => {
+        const vi = VERSIONS.find((v) => v.id === res.version);
+        const vd = res.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
+        if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${getBookName(vo.localAbbrev)} ${vo.chap}:${vo.sec}`, text: stripTags(vd.bible_text) });
       });
     }
     return formatVersesForShare(lines);
-  };
+  }, [selected, verses, results]);
 
-  const handleTopCopy = async () => {
-    // Select all, copy, then deselect
-    const allKeys = new Set(verses.map(v => v.key));
+  const handleTopCopy = useCallback(async () => {
     const lines = [];
     for (const vo of verses) {
-      if (!allKeys.has(vo.key)) continue;
-      results.forEach(res => {
-        const vi = VERSIONS.find(v => v.id === res.version);
-        const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
-        if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${vo.chineses} ${vo.chap}:${vo.sec}`, text: vd.bible_text.replace(/<[^>]+>/g, '') });
+      results.forEach((res) => {
+        const vi = VERSIONS.find((v) => v.id === res.version);
+        const vd = res.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
+        if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${getBookName(vo.localAbbrev)} ${vo.chap}:${vo.sec}`, text: stripTags(vd.bible_text) });
       });
     }
     const text = formatVersesForShare(lines);
-    if (text) { await copyToClipboard(text); setTopCopied(true); setTimeout(() => setTopCopied(false), 2000); }
-  };
+    if (text) {
+      await copyToClipboard(text);
+      setTopCopied(true);
+      window.setTimeout(() => setTopCopied(false), 2000);
+    }
+  }, [verses, results]);
 
   useEffect(() => {
     const handler = () => {
       if (selected.size === 0) {
         handleTopCopy();
-        alert('✅ 已複製全部經文！');
+        window.alert('已複製全部經文');
       } else {
-        const txt = getSelectedText();
-        copyToClipboard(txt);
-        alert('✅ 已複製勾選的經文！');
+        const text = getSelectedText();
+        copyToClipboard(text);
+        window.alert('已複製勾選的經文');
       }
     };
     document.addEventListener('global-copy', handler);
     return () => document.removeEventListener('global-copy', handler);
-  }, [selected, verses, results]);
+  }, [selected.size, handleTopCopy, getSelectedText]);
 
   if (verses.length === 0) return <EmptyState text={`找不到含有「${keyword}」的經文`} />;
 
-  const goToChapter = (chineses, chap) => {
-    if (onNavigate) {
-      const q = `${chineses} ${chap}`;
-      onNavigate(q);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  const goToChapter = (localAbbrev, chap) => {
+    onNavigate(`${getBookName(localAbbrev)} ${chap}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
     <div style={S.resultCard}>
-      {/* Stats + Top Copy Button */}
-      <div style={{ ...S.statsBar, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '12px 16px' }}>
-        <span style={{ color: '#b45309', fontSize: 14, fontWeight: 600 }}>🔍 關鍵字：<strong>「{keyword}」</strong></span>
-        <span style={{ color: '#92400e', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆（{verses.length} 節）<span style={{ color: '#6b7280', fontSize: 12, marginLeft: 6, fontWeight: 500 }} title="查詢花費時間">{data.timeMs ? `${data.timeMs}ms` : ''}</span></span>
-        <button onClick={handleTopCopy} className="btn-active-effect" style={{ ...(topCopied ? S.btnCopied : S.btnCopy), padding: '16px 32px', fontSize: 20, minWidth: '250px', flexGrow: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          {topCopied ? '✅ 已複製全部' : '📋 複製全部經文'}
+      <div style={{ ...S.statsBar, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: '12px 16px' }}>
+        <span style={{ color: '#b45309', fontSize: 14, fontWeight: 700 }}>關鍵字：<strong>「{keyword}」</strong></span>
+        <span style={{ color: '#92400e', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆命中（{verses.length} 節）<span style={{ color: '#6b7280', fontSize: 12, marginLeft: 6, fontWeight: 500 }}>{data.timeMs ? `${data.timeMs}ms` : ''}</span></span>
+        <button type="button" onClick={handleTopCopy} className="btn-active-effect" style={{ ...(topCopied ? S.btnCopied : S.btnCopy), padding: '13px 24px', fontSize: 17, minWidth: 210, flexGrow: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          {topCopied ? '已複製全部' : '複製全部經文'}
         </button>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginLeft: 'auto' }}>
-          {results.map(r => {
-            const vi = VERSIONS.find(v => v.id === r.version);
-            return <span key={r.version} style={{ fontSize: 11, border: '1px solid #fde68a', color: VERSION_COLORS[r.version] || '#92400e', borderRadius: 999, padding: '2px 8px', fontWeight: 600, background: 'linear-gradient(145deg, #fffde7, #fff9c4)' }}>
-              {vi?.label}: {r.record?.length ?? 0}
-            </span>;
+          {results.map((r) => {
+            const vi = VERSIONS.find((v) => v.id === r.version);
+            const count = Number.isInteger(r.matchedCount) ? r.matchedCount : (r.record?.length ?? 0);
+            return <span key={r.version} style={{ fontSize: 11, border: '1px solid #fde68a', color: VERSION_COLORS[r.version] || '#92400e', borderRadius: 999, padding: '2px 8px', fontWeight: 700, background: '#fffde7' }}>{vi?.label}: {count}</span>;
           })}
         </div>
       </div>
       <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large isTop />
-      {/* Headers */}
-      <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} style={S.checkbox} />
         </div>
-        {results.map((res, i) => {
-          const vi = VERSIONS.find(v => v.id === res.version);
-          return <div key={i} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || '#333', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
+        {results.map((res) => {
+          const vi = VERSIONS.find((v) => v.id === res.version);
+          return <div key={res.version} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || '#333', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
         })}
       </div>
-      {/* Rows */}
       <div>
-        {verses.map(vo => (
-          <div key={vo.key} style={{ borderBottom: '1px solid #e8f5e9', background: selected.has(vo.key) ? '#fef9c340' : 'transparent', transition: 'background 0.15s' }}>
-            <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `44px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
-              <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2 }}>
-                <input type="checkbox" checked={selected.has(vo.key)} onChange={() => toggleVerse(vo.key)} style={S.checkbox} />
-                <a onClick={(e) => { e.preventDefault(); goToChapter(vo.chineses, vo.chap); }} href="#" className="mobile-verse-label" style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${vo.chineses} 第 ${vo.chap} 章`}>{vo.chineses} {vo.chap}:{vo.sec}</a>
-                <FhlLink abbrev={bookMap.find(b => b.names[0] === vo.chineses)?.localAbbrev} chap={vo.chap} sec={vo.sec} />
-              </div>
-              {results.map((res, i) => {
-                const vd = res.record?.find(r => r.chineses === vo.chineses && r.chap === vo.chap && r.sec === vo.sec);
-                const vi = VERSIONS.find(v => v.id === res.version);
-                const col = VERSION_COLORS[res.version] || '#333';
-                return (
-                  <div key={i} className="verse-text-content" style={{ color: col, lineHeight: 1.7, fontSize: fontSize || 15 }}>
-                    <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
-                    <a
-                      onClick={(e) => { e.preventDefault(); goToChapter(vo.chineses, vo.chap); }}
-                      href="#"
-                      className="desktop-verse-num"
-                      style={{ color: '#1565c0', fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.85, textDecoration: 'underline', cursor: 'pointer' }}
-                      title={`查看 ${vo.chineses} 第 ${vo.chap} 章`}
-                    >
-                      {vo.chineses} {vo.chap}:{vo.sec}
+        {verses.map((vo) => {
+          const reference = makeReference(vo.localAbbrev, vo.chap, vo.sec);
+          const annotation = annotations[getVerseKey(reference)];
+          const baseText = getBaseTextForVerse(results, vo.chap, vo.sec, vo.chineses);
+          const rowBackground = selected.has(vo.key) ? '#fef9c340' : softColor(annotation?.color);
+          return (
+            <div key={vo.key} style={{ borderBottom: '1px solid #e8f5e9', background: rowBackground, transition: 'background 0.15s' }}>
+              <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
+                <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2, flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" checked={selected.has(vo.key)} onChange={() => toggleVerse(vo.key)} style={S.checkbox} />
+                    <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="mobile-verse-label" style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
+                      {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
                     </a>
-                    {vd ? <HighlightText text={vd.bible_text.replace(/<[^>]+>/g, '')} keyword={keyword} /> : <span style={{ color: '#ccc' }}>--</span>}
+                    <FhlLink abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} />
                   </div>
-                );
-              })}
+                  <AnnotationEditor reference={reference} annotation={annotation} onChange={onAnnotationChange} />
+                </div>
+                {results.map((res) => {
+                  const vd = res.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
+                  const vi = VERSIONS.find((v) => v.id === res.version);
+                  const col = VERSION_COLORS[res.version] || '#333';
+                  return (
+                    <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || 15 }}>
+                      <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
+                      <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="desktop-verse-num" style={{ color: '#1565c0', fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.9, textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
+                        {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
+                      </a>
+                      {vd ? <VerseText text={vd.bible_text} keyword={keyword} compareText={diffEnabled ? baseText : ''} /> : <span style={{ color: '#aaa' }}>--</span>}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
       <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large />
@@ -603,33 +894,106 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize }) {
   );
 }
 
-// ─── Shared empty state ──────────────────────────────────────────────────────
-function EmptyState({ text }) {
-  return <div style={{ textAlign: 'center', color: '#999', padding: '48px 0', ...S.resultCard }}>{text}</div>;
+function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDeleteHistory, onRunAnnotation, onDeleteAnnotation, onExport, onImport }) {
+  const fileInputRef = useRef(null);
+  const annotationItems = useMemo(() => Object.entries(annotations)
+    .map(([key, value]) => ({ key, ...value }))
+    .filter((item) => item.favorite || item.note || item.color)
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)), [annotations]);
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        onImport(JSON.parse(reader.result));
+        window.alert('匯入完成');
+      } catch {
+        window.alert('匯入失敗：JSON 格式不正確');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div style={{ ...S.card, maxWidth: 1180, margin: '0 auto 22px', padding: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <h2 style={{ margin: 0, color: '#1b5e20', fontSize: 18 }}>我的查詢與筆記</h2>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" onClick={onExport} style={S.smallBtn}>匯出 JSON</button>
+          <button type="button" onClick={() => fileInputRef.current?.click()} style={S.smallBtn}>匯入 JSON</button>
+          <input ref={fileInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={handleFile} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+        <section style={{ background: '#ffffffcc', border: '1px solid #d9ead3', borderRadius: 10, padding: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h3 style={{ margin: 0, color: '#2e7d32', fontSize: 15 }}>查詢歷史</h3>
+            {history.length > 0 && <button type="button" onClick={onClearHistory} style={S.dangerBtn}>清空</button>}
+          </div>
+          {history.length === 0 && <p style={{ margin: 0, color: '#6b7280', fontSize: 13 }}>查詢後會自動保留最近紀錄。</p>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
+            {history.slice(0, 12).map((item) => (
+              <div key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: '#fff' }}>
+                <button type="button" onClick={() => onRunHistory(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
+                  <strong style={{ color: '#111827', fontSize: 14 }}>{item.query}</strong>
+                  <div style={{ color: '#6b7280', fontSize: 12, marginTop: 3 }}>
+                    {formatDateTime(item.ts)} · {item.resultCount} 筆 · {item.versions?.join(', ')}
+                  </div>
+                </button>
+                <button type="button" onClick={() => onDeleteHistory(item.id)} style={{ ...S.dangerBtn, marginTop: 6 }}>刪除</button>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section style={{ background: '#ffffffcc', border: '1px solid #d9ead3', borderRadius: 10, padding: 12 }}>
+          <h3 style={{ margin: '0 0 8px', color: '#2e7d32', fontSize: 15 }}>收藏 / 筆記 / 螢光筆</h3>
+          {annotationItems.length === 0 && <p style={{ margin: 0, color: '#6b7280', fontSize: 13 }}>在經文旁可收藏、標色與寫筆記。</p>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
+            {annotationItems.slice(0, 30).map((item) => (
+              <div key={item.key} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: item.color || '#fff' }}>
+                <button type="button" onClick={() => onRunAnnotation(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
+                  <strong style={{ color: '#111827', fontSize: 14 }}>{item.label}</strong>
+                  <div style={{ color: '#4b5563', fontSize: 12, marginTop: 3 }}>{item.favorite ? '已收藏' : '已標記'} · {formatDateTime(item.updatedAt)}</div>
+                  {item.note && <p style={{ margin: '6px 0 0', color: '#374151', fontSize: 13, lineHeight: 1.45 }}>{item.note}</p>}
+                </button>
+                <button type="button" onClick={() => onDeleteAnnotation(item)} style={{ ...S.dangerBtn, marginTop: 6 }}>刪除</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
 }
 
-// ─── Install PWA Button ──────────────────────────────────────────────────────
 function InstallButton() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [installed, setInstalled] = useState(false);
+  const [installed, setInstalled] = useState(() => window.matchMedia('(display-mode: standalone)').matches);
+
   useEffect(() => {
     const handler = (e) => {
       e.preventDefault();
       window.deferredInstallPrompt = e;
       setDeferredPrompt(e);
     };
-    // 萬一事件早已觸發
-    if (window.deferredInstallPrompt) setDeferredPrompt(window.deferredInstallPrompt);
+    const installedHandler = () => setInstalled(true);
 
+    if (window.deferredInstallPrompt) setDeferredPrompt(window.deferredInstallPrompt);
     window.addEventListener('beforeinstallprompt', handler);
-    if (window.matchMedia('(display-mode: standalone)').matches) setInstalled(true);
-    window.addEventListener('appinstalled', () => setInstalled(true));
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', installedHandler);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
+    };
   }, []);
+
   const handleInstall = async () => {
     const promptEvent = deferredPrompt || window.deferredInstallPrompt;
     if (!promptEvent) {
-      alert('📲 安裝方式：\n\n• 電腦 / Android：目前環境可能不支援或您已安裝過。如果未安裝，請透過網址列右側的【安裝】按鈕來安裝。\n• iPhone / iPad：請點選 Safari 底部工具列的「分享按鈕」，然後選擇「加入主畫面」。');
+      window.alert('安裝方式：電腦或 Android 可使用網址列右側安裝按鈕；iPhone / iPad 請從 Safari 分享選單加入主畫面。');
       return;
     }
     promptEvent.prompt();
@@ -638,52 +1002,182 @@ function InstallButton() {
     setDeferredPrompt(null);
     window.deferredInstallPrompt = null;
   };
-  if (installed) return <span style={{ fontSize: 12, color: '#2e7d32', padding: '6px 14px', borderRadius: 999, border: '1px solid #a5d6a7', background: 'linear-gradient(145deg, #e8f5e9, #c8e6c9)', fontWeight: 600 }}>✅ 已安裝</span>;
-  return <button onClick={handleInstall} style={{ ...S.btnInstall, padding: '10px 22px', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>📲 安裝 App</button>;
+
+  if (installed) return <span style={{ fontSize: 12, color: '#2e7d32', padding: '6px 14px', borderRadius: 999, border: '1px solid #a5d6a7', background: '#e8f5e9', fontWeight: 700 }}>已安裝</span>;
+  return <button type="button" onClick={handleInstall} style={{ ...S.btnInstall, padding: '10px 22px', fontSize: 14 }}>安裝 App</button>;
 }
 
-// ─── App root ────────────────────────────────────────────────────────────────
 export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [versions, setVersions] = useState(['unv', 'niv', 'esv', 'ncv', 'lzz']);
-  const [fontSize, setFontSize] = useState(15);
+  const [versions, setVersions] = usePersistentState(LS_KEYS.versions, ['unv', 'niv', 'esv', 'ncv', 'lzz']);
+  const [fontSize, setFontSize] = usePersistentState(LS_KEYS.fontSize, 15);
+  const [diffEnabled, setDiffEnabled] = usePersistentState(LS_KEYS.diffEnabled, true);
+  const [history, setHistory] = usePersistentState(LS_KEYS.history, []);
+  const [annotations, setAnnotations] = usePersistentState(LS_KEYS.annotations, {});
   const [bibleStructure, setBibleStructure] = useState(null);
 
   useEffect(() => {
     fetch('/data/unv.json')
-      .then(r => r.json())
-      .then(data => setBibleStructure(data))
-      .catch(err => console.error("Error loading bible structure:", err));
+      .then((r) => r.json())
+      .then((structure) => setBibleStructure(structure))
+      .catch((err) => console.error('Error loading bible structure:', err));
   }, []);
 
-  const handleSearch = useCallback(async (query, selectedVersions) => {
+  const addHistory = useCallback((query, selectedVersions, searchOptions, result) => {
+    const resultCount = result.mode === 'keyword'
+      ? new Set(result.results.flatMap((r) => r.record?.map((v) => `${v.localAbbrev}:${v.chap}:${v.sec}`) || [])).size
+      : result.results.reduce((sum, r) => sum + (r.record?.length || 0), 0);
+    const cleanOptions = searchOptions || {};
+    const dedupeKey = JSON.stringify({ query, selectedVersions, cleanOptions });
+    const item = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      key: dedupeKey,
+      query,
+      versions: selectedVersions,
+      options: cleanOptions,
+      mode: result.mode,
+      resultCount,
+      ts: new Date().toISOString(),
+    };
+
+    setHistory((prev) => [item, ...prev.filter((h) => h.key !== dedupeKey)].slice(0, 60));
+  }, [setHistory]);
+
+  const handleSearch = useCallback(async (query, selectedVersions = versions, searchOptions = {}) => {
     const t0 = performance.now();
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetchBible(query, selectedVersions);
+      const res = await fetchBible(query, selectedVersions, searchOptions);
       res.timeMs = Math.round(performance.now() - t0);
       setData(res);
+      addHistory(query.trim(), selectedVersions, searchOptions, res);
+    } catch (err) {
+      setError(err.message);
+      setData(null);
+    } finally {
+      setLoading(false);
     }
-    catch (err) { setError(err.message); setData(null); }
-    finally { setLoading(false); }
-  }, []);
+  }, [versions, addHistory]);
+
+  const updateAnnotation = useCallback((reference, patch) => {
+    setAnnotations((prev) => {
+      const key = getVerseKey(reference);
+      if (patch.clear) {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+      const nextItem = {
+        ...(prev[key] || {}),
+        ...reference,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      const isEmpty = !nextItem.favorite && !nextItem.note && !nextItem.color;
+      const next = { ...prev };
+      if (isEmpty) delete next[key];
+      else next[key] = nextItem;
+      return next;
+    });
+  }, [setAnnotations]);
+
+  const deleteAnnotation = useCallback((item) => {
+    setAnnotations((prev) => {
+      const next = { ...prev };
+      delete next[item.key || getVerseKey(item)];
+      return next;
+    });
+  }, [setAnnotations]);
+
+  const runHistory = useCallback((item) => {
+    if (Array.isArray(item.versions) && item.versions.length > 0) setVersions(item.versions);
+    handleSearch(item.query, item.versions || versions, item.options || {});
+  }, [handleSearch, setVersions, versions]);
+
+  const runAnnotation = useCallback((item) => {
+    const query = `${getBookName(item.abbrev)} ${item.chap}:${item.sec}`;
+    handleSearch(query, versions, {});
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [handleSearch, versions]);
+
+  const exportData = useCallback(() => {
+    const payload = {
+      app: '多譯本聖經查詢',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      history,
+      annotations,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bible-notes-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [history, annotations]);
+
+  const importData = useCallback((payload) => {
+    if (!payload || typeof payload !== 'object') throw new Error('Invalid payload');
+    if (Array.isArray(payload.history)) {
+      setHistory((prev) => [...payload.history, ...prev].slice(0, 80));
+    }
+    if (payload.annotations && typeof payload.annotations === 'object') {
+      setAnnotations((prev) => ({ ...prev, ...payload.annotations }));
+    }
+  }, [setHistory, setAnnotations]);
 
   return (
-    <div style={{ ...S.bg, padding: 0, paddingTop: 56, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-      <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} />
-      <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed />
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24, padding: '0 16px' }}>
-        <InstallButton />
+    <div id="top" style={{ ...S.bg, padding: 0, paddingTop: 56, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+      <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 16px' }}>
+        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} />
+        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} />
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+          <InstallButton />
+        </div>
+        <UserLibrary
+          history={history}
+          annotations={annotations}
+          onRunHistory={runHistory}
+          onClearHistory={() => setHistory([])}
+          onDeleteHistory={(id) => setHistory((prev) => prev.filter((item) => item.id !== id))}
+          onRunAnnotation={runAnnotation}
+          onDeleteAnnotation={deleteAnnotation}
+          onExport={exportData}
+          onImport={importData}
+        />
+        {error && <div style={{ background: '#ffebee', border: '1px solid #ef9a9a', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: '#c62828' }}>警告：{error}</div>}
+        {loading && <div style={{ textAlign: 'center', color: '#2e7d32', padding: '64px 0', fontSize: 18, fontWeight: 700 }}>搜尋中，請稍候...</div>}
+        {!loading && data && data.mode === 'verse' && (
+          <VerseViewer
+            data={data}
+            bibleStructure={bibleStructure}
+            onNavigate={(q) => handleSearch(q, versions, data.searchOptions || {})}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
+            annotations={annotations}
+            onAnnotationChange={updateAnnotation}
+            diffEnabled={diffEnabled}
+          />
+        )}
+        {!loading && data && data.mode === 'keyword' && (
+          <KeywordViewer
+            data={data}
+            onNavigate={(q) => handleSearch(q, versions, data.searchOptions || {})}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
+            annotations={annotations}
+            onAnnotationChange={updateAnnotation}
+            diffEnabled={diffEnabled}
+          />
+        )}
+        <footer style={{ marginTop: 48, textAlign: 'center', color: '#66a96a', fontSize: 12, paddingBottom: 32 }}>
+          資料來源：信望愛 (FHL) 聖經、本機 JSON、8 種譯本離線可用
+        </footer>
       </div>
-      {error && <div style={{ background: 'linear-gradient(145deg, #ffebee, #ffcdd2)', border: '1px solid #ef9a9a', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: '#c62828' }}>⚠️ {error}</div>}
-      {loading && <div style={{ textAlign: 'center', color: '#2e7d32', padding: '64px 0', fontSize: 18, fontWeight: 600 }}>⏳ 搜尋中，請稍候…</div>}
-      {!loading && data && data.mode === 'verse' && <VerseViewer data={data} bibleStructure={bibleStructure} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} setFontSize={setFontSize} />}
-      {!loading && data && data.mode === 'keyword' && <KeywordViewer data={data} onNavigate={(q) => handleSearch(q, versions)} fontSize={fontSize} setFontSize={setFontSize} />}
-      <footer style={{ marginTop: 48, textAlign: 'center', color: '#81c784', fontSize: 12, padding: '0 16px' }}>
-        資料來源：信望愛 (FHL) 聖經 ・ 本機 JSON ・ 8 種譯本離線可用
-      </footer>
     </div>
   );
 }
