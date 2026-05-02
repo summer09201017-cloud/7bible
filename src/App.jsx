@@ -218,20 +218,19 @@ function getFhlCommentaryUrl(abbrev, chap, sec) {
   const fhlEngs = FHL_ENGS_BY_LOCAL[abbrev];
   if (!fhlEngs) return null;
   const params = new URLSearchParams({
-    chineses: fhlEngs,
+    book: '3',
+    engs: fhlEngs,
     chap: String(chap),
     sec: String(sec),
-    strongflag: '1',
-    TABFLAG: '1',
   });
-  return `https://bible.fhl.net/new/read.php?${params.toString()}`;
+  return `https://bible.fhl.net/new/com.php?${params.toString()}`;
 }
 
 function FhlLink({ abbrev, chap, sec }) {
   const url = getFhlCommentaryUrl(abbrev, chap, sec);
   if (!url) return null;
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛閱讀頁與註釋欄" style={{ color: '#b45309', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid #fcd34d', borderRadius: 5, backgroundColor: '#fffbeb', fontWeight: 700, display: 'inline-block' }}>
+    <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛站註釋資料" style={{ color: '#b45309', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid #fcd34d', borderRadius: 5, backgroundColor: '#fffbeb', fontWeight: 700, display: 'inline-block' }}>
       註釋
     </a>
   );
