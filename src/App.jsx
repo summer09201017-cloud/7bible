@@ -227,6 +227,40 @@ function getFhlCommentaryUrl(abbrev, chap, sec) {
   return `https://bible.fhl.net/new/com.php?${params.toString()}`;
 }
 
+function CopyVerseButton({ getText }) {
+  const [copied, setCopied] = useState(false);
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const text = getText();
+    if (!text) return;
+    await copyToClipboard(text);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      title="複製這節"
+      style={{
+        marginLeft: 6,
+        padding: '2px 8px',
+        fontSize: 11,
+        fontWeight: 700,
+        border: copied ? '1px solid #2e7d32' : '1px solid #93c5fd',
+        background: copied ? '#dcfce7' : '#eff6ff',
+        color: copied ? '#166534' : '#1d4ed8',
+        borderRadius: 5,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {copied ? '已複製' : '複製'}
+    </button>
+  );
+}
+
 function FhlLink({ abbrev, chap, sec }) {
   const url = getFhlCommentaryUrl(abbrev, chap, sec);
   if (!url) return null;
@@ -308,25 +342,25 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
 
   return (
     <div style={{ background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', borderTop: '1px solid #a5d6a7', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button type="button" disabled={!hasPrevChap} onClick={() => go(`${bookName} ${chapNum - 1}`)} className="btn-active-effect" style={hasPrevChap ? btnNav : btnNavDisabled}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center', width: '100%', maxWidth: '100%' }}>
+        <button type="button" disabled={!hasPrevChap} onClick={() => go(`${bookName} ${chapNum - 1}`)} className="btn-active-effect" style={{ ...(hasPrevChap ? btnNav : btnNavDisabled), flexShrink: 0 }}>
           上一章
         </button>
-        <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+        <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px', flex: '1 1 auto', minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {bookName} {chapNum} 章 {isSingleVerse ? `${secNum}節` : ''}
           {data.timeMs && <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 6, fontWeight: 500 }}>({data.timeMs}ms)</span>}
         </span>
-        <button type="button" disabled={!hasNextChap} onClick={() => go(`${bookName} ${chapNum + 1}`)} className="btn-active-effect" style={hasNextChap ? btnNav : btnNavDisabled}>
+        <button type="button" disabled={!hasNextChap} onClick={() => go(`${bookName} ${chapNum + 1}`)} className="btn-active-effect" style={{ ...(hasNextChap ? btnNav : btnNavDisabled), flexShrink: 0 }}>
           下一章
         </button>
       </div>
       {isSingleVerse && (
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button type="button" disabled={!hasPrevVerse} onClick={() => go(`${bookName} ${chapNum}:${secNum - 1}`)} style={hasPrevVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)' } : btnNavDisabled}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+          <button type="button" disabled={!hasPrevVerse} onClick={() => go(`${bookName} ${chapNum}:${secNum - 1}`)} style={{ ...(hasPrevVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)' } : btnNavDisabled), flexShrink: 0 }}>
             上一節
           </button>
-          <span style={{ fontSize: 13, color: '#555', display: 'flex', alignItems: 'center' }}>第 {secNum} / {totalVerses} 節</span>
-          <button type="button" disabled={!hasNextVerse} onClick={() => go(`${bookName} ${chapNum}:${secNum + 1}`)} style={hasNextVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)' } : btnNavDisabled}>
+          <span style={{ fontSize: 13, color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1 1 auto', minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap' }}>第 {secNum} / {totalVerses} 節</span>
+          <button type="button" disabled={!hasNextVerse} onClick={() => go(`${bookName} ${chapNum}:${secNum + 1}`)} style={{ ...(hasNextVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)' } : btnNavDisabled), flexShrink: 0 }}>
             下一節
           </button>
         </div>
@@ -391,8 +425,17 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
       if (versions.length > 1) setVersions(versions.filter((v) => v !== versionId));
       return;
     }
-    const nextVersions = [...versions, versionId].sort((a, b) => VERSIONS.findIndex((v) => v.id === a) - VERSIONS.findIndex((v) => v.id === b));
-    setVersions(nextVersions);
+    setVersions([...versions, versionId]);
+  };
+
+  const moveVersion = (versionId, direction) => {
+    const idx = versions.indexOf(versionId);
+    if (idx < 0) return;
+    const target = idx + direction;
+    if (target < 0 || target >= versions.length) return;
+    const next = [...versions];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setVersions(next);
   };
 
   let chaptersCount = 0;
@@ -464,13 +507,33 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
         </button>
       </form>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
-        {VERSIONS.filter((v) => v.id !== 'web').map((v) => (
-          <label key={v.id} style={versions.includes(v.id) ? { ...S.pillActive, padding: '6px 16px', fontSize: 13 } : { ...S.pillInactive, padding: '6px 16px', fontSize: 13 }}>
-            <input type="checkbox" style={{ display: 'none' }} checked={versions.includes(v.id)} onChange={() => handleVersionToggle(v.id)} />
-            {v.label}
-          </label>
-        ))}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 6 }}>
+        {[
+          ...versions.map((vid) => VERSIONS.find((v) => v.id === vid)).filter(Boolean),
+          ...VERSIONS.filter((v) => v.id !== 'web' && !versions.includes(v.id)),
+        ].map((v) => {
+          const isActive = versions.includes(v.id);
+          const idx = isActive ? versions.indexOf(v.id) : -1;
+          const isFirst = idx === 0;
+          const isLast = idx === versions.length - 1;
+          return (
+            <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 0 }}>
+              {isActive && !isFirst && (
+                <button type="button" onClick={() => moveVersion(v.id, -1)} title="往左移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 4px', fontSize: 12, color: '#1b5e20', fontWeight: 800 }}>◀</button>
+              )}
+              <label style={isActive ? { ...S.pillActive, padding: '6px 16px', fontSize: 13 } : { ...S.pillInactive, padding: '6px 16px', fontSize: 13 }}>
+                <input type="checkbox" style={{ display: 'none' }} checked={isActive} onChange={() => handleVersionToggle(v.id)} />
+                {v.label}
+              </label>
+              {isActive && !isLast && (
+                <button type="button" onClick={() => moveVersion(v.id, 1)} title="往右移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 4px', fontSize: 12, color: '#1b5e20', fontWeight: 800 }}>▶</button>
+              )}
+            </span>
+          );
+        })}
+      </div>
+      <div style={{ textAlign: 'center', fontSize: 11, color: '#6b7280', marginBottom: 12 }}>
+        點選譯本切換顯示, 用 ◀▶ 調整顯示順序
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: showAdvanced ? 12 : 0 }}>
@@ -716,6 +779,18 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
     return formatVersesForShare(lines);
   }, [selected, results, bookName, data.chap]);
 
+  const getSingleVerseText = useCallback((vNum) => {
+    const lines = [];
+    results.forEach((res) => {
+      const vi = VERSIONS.find((v) => v.id === res.version);
+      const vd = res.record?.find((r) => r.sec === vNum);
+      if (vd?.bible_text && vd.bible_text !== '--') {
+        lines.push({ ref: `[${vi?.label}] ${bookName} ${data.chap}:${vNum}`, text: stripTags(vd.bible_text) });
+      }
+    });
+    return formatVersesForShare(lines);
+  }, [results, bookName, data.chap]);
+
   useEffect(() => {
     const handler = () => {
       const text = getSelectedText();
@@ -755,12 +830,13 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
             <div key={vNum} style={{ borderBottom: '1px solid #e8f5e9', background: rowBackground, transition: 'background 0.15s' }}>
               <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
                 <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2, flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} style={S.checkbox} />
                     <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="mobile-verse-label" style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
                       第 {vNum} 節
                     </a>
                     <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
+                    <CopyVerseButton getText={() => getSingleVerseText(vNum)} />
                   </div>
                   <AnnotationEditor reference={reference} annotation={annotation} onChange={onAnnotationChange} />
                 </div>
@@ -844,6 +920,16 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
     return formatVersesForShare(lines);
   }, [selected, verses, results]);
 
+  const getSingleVerseTextForKeyword = useCallback((vo) => {
+    const lines = [];
+    results.forEach((res) => {
+      const vi = VERSIONS.find((v) => v.id === res.version);
+      const vd = res.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
+      if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${getBookName(vo.localAbbrev)} ${vo.chap}:${vo.sec}`, text: stripTags(vd.bible_text) });
+    });
+    return formatVersesForShare(lines);
+  }, [results]);
+
   const handleTopCopy = useCallback(async () => {
     const lines = [];
     for (const vo of verses) {
@@ -919,12 +1005,13 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
             <div key={vo.key} style={{ borderBottom: '1px solid #e8f5e9', background: rowBackground, transition: 'background 0.15s' }}>
               <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
                 <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2, flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <input type="checkbox" checked={selected.has(vo.key)} onChange={() => toggleVerse(vo.key)} style={S.checkbox} />
                     <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="mobile-verse-label" style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
                       {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
                     </a>
                     <FhlLink abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} />
+                    <CopyVerseButton getText={() => getSingleVerseTextForKeyword(vo)} />
                   </div>
                   <AnnotationEditor reference={reference} annotation={annotation} onChange={onAnnotationChange} />
                 </div>
