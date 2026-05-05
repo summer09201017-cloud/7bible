@@ -7,6 +7,55 @@ body {
   min-height: 100vh;
 }
 
+/* ─── Dark mode ─── */
+html[data-theme="dark"] body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  color: #e2e8f0;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+html[data-theme="dark"] mark {
+  filter: brightness(0.85);
+}
+
+/* ─── Print mode ─── */
+@media print {
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  /* hide nav/buttons/toolbars */
+  button,
+  input[type="checkbox"],
+  select,
+  .btn-active-effect,
+  [class*="ActionBar"] {
+    display: none !important;
+  }
+  /* Force fixed/sticky bars to hide */
+  div[style*="position: fixed"],
+  div[style*="position:fixed"],
+  div[style*="position: sticky"],
+  div[style*="position:sticky"] {
+    display: none !important;
+  }
+  mark {
+    background: transparent !important;
+    color: #000 !important;
+    font-weight: 700;
+    text-decoration: underline;
+  }
+  a {
+    color: #000 !important;
+    text-decoration: none !important;
+  }
+  body * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
 /* ─── Custom checkbox styling ─── */
 input[type="checkbox"] {
   appearance: none;

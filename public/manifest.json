@@ -20,5 +20,31 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "繼續上次閱讀",
+      "short_name": "繼續閱讀",
+      "url": "/?resume=1"
+    },
+    {
+      "name": "約翰福音 3:16",
+      "short_name": "John 3:16",
+      "url": "/?q=%E7%B4%84%203%3A16"
+    },
+    {
+      "name": "詩篇 23",
+      "short_name": "Ps 23",
+      "url": "/?q=%E8%A9%A9%2023"
+    }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "q",
+      "text": "q",
+      "url": "q"
+    }
+  }
 }

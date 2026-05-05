@@ -29,7 +29,22 @@ const LS_KEYS = {
   fontSize: 'bible-tool-font-size-v1',
   diffEnabled: 'bible-tool-diff-enabled-v1',
   diffBase: 'bible-tool-diff-base-v1',
+  bookmark: 'bible-tool-bookmark-v1',
+  copyFormat: 'bible-tool-copy-format-v1',
+  theme: 'bible-tool-theme-v1',
 };
+
+const BOOK_GROUPS = [
+  { label: '摩西五經', start: 0, end: 4 },
+  { label: '歷史書', start: 5, end: 16 },
+  { label: '詩歌智慧書', start: 17, end: 21 },
+  { label: '大先知書', start: 22, end: 26 },
+  { label: '小先知書', start: 27, end: 38 },
+  { label: '福音書與使徒行傳', start: 39, end: 43 },
+  { label: '保羅書信', start: 44, end: 56 },
+  { label: '一般書信', start: 57, end: 64 },
+  { label: '啟示錄', start: 65, end: 65 },
+];
 
 const FHL_ENGS_BY_LOCAL = {
   gn: 'Gen', ex: 'Ex', lv: 'Lev', nm: 'Num', dt: 'Deut',
@@ -123,10 +138,26 @@ function formatDateTime(value) {
   return date.toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-function formatVersesForShare(selectedVerses) {
+function formatVersesForShare(selectedVerses, format = 'plain') {
   if (!selectedVerses || selectedVerses.length === 0) return '';
+  if (format === 'inline') {
+    return selectedVerses.map((v) => `${v.ref} ${v.text}`).join('\n');
+  }
+  if (format === 'markdown') {
+    return selectedVerses.map((v) => `> ${v.text}\n> — **${v.ref}**`).join('\n\n');
+  }
+  if (format === 'html') {
+    return selectedVerses.map((v) => `<blockquote><p>${v.text}</p><cite>${v.ref}</cite></blockquote>`).join('\n');
+  }
   return selectedVerses.map((v) => `${v.ref}\n${v.text}`).join('\n\n');
 }
+
+const COPY_FORMAT_OPTIONS = [
+  { id: 'plain', label: '純文字' },
+  { id: 'inline', label: '單行含引用' },
+  { id: 'markdown', label: 'Markdown' },
+  { id: 'html', label: 'HTML' },
+];
 
 function shareToLine(text) {
   window.open(`https://social-plugins.line.me/lineit/share?url=&text=${encodeURIComponent(text)}`, '_blank');
@@ -181,11 +212,35 @@ function isDiffToken(token, diffContext) {
   return /^[A-Za-z']{3,}$/.test(token) && !diffContext.set.has(token.toLowerCase());
 }
 
-function VerseText({ text, keyword, compareText }) {
+const KEYWORD_PALETTE = [
+  { bg: '#fef08a', fg: '#854d0e' },
+  { bg: '#bae6fd', fg: '#075985' },
+  { bg: '#fbcfe8', fg: '#9d174d' },
+  { bg: '#bbf7d0', fg: '#166534' },
+  { bg: '#fed7aa', fg: '#9a3412' },
+  { bg: '#ddd6fe', fg: '#5b21b6' },
+];
+
+function VerseText({ text, keyword, compareText, exactPhrase }) {
   const cleanText = stripTags(text);
-  const escapedKeyword = keyword ? keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
-  const keywordRegex = escapedKeyword ? new RegExp(`(${escapedKeyword})`, 'gi') : null;
   const diffContext = useMemo(() => buildDiffContext(cleanText, compareText), [cleanText, compareText]);
+
+  const terms = useMemo(() => {
+    if (!keyword) return [];
+    if (exactPhrase) return [keyword];
+    return keyword.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+  }, [keyword, exactPhrase]);
+
+  const combinedRegex = useMemo(() => {
+    if (terms.length === 0) return null;
+    const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    return new RegExp(`(${escaped.join('|')})`, 'gi');
+  }, [terms]);
+
+  const termIndex = useCallback((piece) => {
+    const lower = piece.toLowerCase();
+    return terms.findIndex((t) => t.toLowerCase() === lower);
+  }, [terms]);
 
   const renderPlainPart = (part, keyPrefix) => {
     const pieces = diffContext?.kind === 'cjk' ? Array.from(part) : part.split(/([A-Za-z']+)/g);
@@ -200,14 +255,16 @@ function VerseText({ text, keyword, compareText }) {
     });
   };
 
-  if (!keywordRegex) return <span>{renderPlainPart(cleanText, 'plain')}</span>;
+  if (!combinedRegex) return <span>{renderPlainPart(cleanText, 'plain')}</span>;
 
   return (
     <span>
-      {cleanText.split(keywordRegex).map((part, index) => {
+      {cleanText.split(combinedRegex).map((part, index) => {
         if (!part) return null;
-        if (part.toLowerCase() === keyword.toLowerCase()) {
-          return <mark key={`kw-${index}`} style={{ background: '#fef08a', color: '#854d0e', borderRadius: 3, padding: '0 2px' }}>{part}</mark>;
+        const ti = termIndex(part);
+        if (ti >= 0) {
+          const color = KEYWORD_PALETTE[ti % KEYWORD_PALETTE.length];
+          return <mark key={`kw-${index}`} style={{ background: color.bg, color: color.fg, borderRadius: 3, padding: '0 2px' }}>{part}</mark>;
         }
         return <span key={`part-${index}`}>{renderPlainPart(part, `part-${index}`)}</span>;
       })}
@@ -227,7 +284,7 @@ function getFhlCommentaryUrl(abbrev, chap, sec) {
   return `https://bible.fhl.net/new/com.php?${params.toString()}`;
 }
 
-function CopyVerseButton({ getText }) {
+function CopyVerseButton({ getText, countLabel }) {
   const [copied, setCopied] = useState(false);
   const handleClick = async (e) => {
     e.stopPropagation();
@@ -242,7 +299,7 @@ function CopyVerseButton({ getText }) {
     <button
       type="button"
       onClick={handleClick}
-      title="複製這節"
+      title={countLabel || '複製'}
       style={{
         marginLeft: 6,
         padding: '2px 8px',
@@ -256,7 +313,7 @@ function CopyVerseButton({ getText }) {
         whiteSpace: 'nowrap',
       }}
     >
-      {copied ? '已複製' : '複製'}
+      {copied ? '已複製' : countLabel || '複製'}
     </button>
   );
 }
@@ -271,7 +328,7 @@ function FhlLink({ abbrev, chap, sec }) {
   );
 }
 
-function ActionBar({ getSelectedText, selectedCount, large, isTop }) {
+function ActionBar({ getSelectedText, selectedCount, large, isTop, copyFormat, setCopyFormat }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
     const text = getSelectedText();
@@ -293,6 +350,16 @@ function ActionBar({ getSelectedText, selectedCount, large, isTop }) {
       <button type="button" onClick={handleCopy} disabled={disabled} className="btn-active-effect" style={{ ...(copied ? S.btnCopied : S.btnCopy), ...disabledStyle, ...copySize, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         {copied ? '已複製' : '複製經文'}
       </button>
+      {setCopyFormat && (
+        <select
+          value={copyFormat || 'plain'}
+          onChange={(e) => setCopyFormat(e.target.value)}
+          title="複製格式"
+          style={{ background: '#ffffff', border: '1px solid #a5d6a7', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: '#1b5e20', fontWeight: 700, cursor: 'pointer' }}
+        >
+          {COPY_FORMAT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
+      )}
       <button type="button" onClick={() => shareToLine(getSelectedText())} disabled={disabled} className="btn-active-effect" style={{ ...S.btnLine, ...disabledStyle, ...shareSize }}>
         分享到 Line
       </button>
@@ -365,6 +432,14 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
           </button>
         </div>
       )}
+      <div style={{ width: '100%', maxWidth: 600, padding: '0 4px' }} title={`${bookName} 共 ${totalChaps} 章`}>
+        <div style={{ height: 4, background: '#c8e6c9', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+          <div style={{ height: '100%', width: `${Math.max(2, (chapNum / totalChaps) * 100)}%`, background: 'linear-gradient(90deg, #43a047, #1b5e20)', transition: 'width 0.2s' }} />
+        </div>
+        <div style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', marginTop: 2 }}>
+          {bookName} {chapNum} / {totalChaps} 章{isSingleVerse ? ` · 第 ${secNum} / ${totalVerses} 節` : ''}
+        </div>
+      </div>
     </div>
   );
 }
@@ -468,7 +543,8 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
               setSelEndVerse('');
             }
           }}
-          placeholder="關鍵字或書卷章節，例如：愛心、創 1、John 3:16"
+          placeholder="關鍵字或書卷章節，例如：愛心、創 1、John 3:16 (按 / 聚焦, 按 ? 快速鍵說明)"
+          id="bible-search-input"
           style={{ ...S.input, width: '100%', padding: '14px 18px', fontSize: 16, outline: 'none', color: '#333' }}
           onFocus={(e) => { e.target.style.borderColor = '#43a047'; }}
           onBlur={(e) => { e.target.style.borderColor = '#a5d6a7'; }}
@@ -477,9 +553,14 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           <select value={selBook} onChange={(e) => { setSelBook(e.target.value); setSelChap(''); setSelVerse(''); setSelEndVerse(''); }} style={S.select}>
             <option value="">選擇書卷</option>
-            {bibleStructure && bibleStructure.map((b) => {
-              const bInfo = bookMap.find((bm) => bm.localAbbrev === b.abbrev);
-              return <option key={b.abbrev} value={b.abbrev}>{bInfo ? bInfo.names[1] : b.name}</option>;
+            {bibleStructure && BOOK_GROUPS.map((group) => {
+              const opts = bookMap.slice(group.start, group.end + 1).map((bInfo) => {
+                const struct = bibleStructure.find((b) => b.abbrev === bInfo.localAbbrev);
+                if (!struct) return null;
+                return <option key={bInfo.localAbbrev} value={bInfo.localAbbrev}>{bInfo.names[1]}</option>;
+              }).filter(Boolean);
+              if (opts.length === 0) return null;
+              return <optgroup key={group.label} label={group.label}>{opts}</optgroup>;
             })}
           </select>
 
@@ -745,7 +826,7 @@ function getBaseTextForVerse(results, chap, sec, chineses, baseVersion) {
   return record ? record.bible_text : '';
 }
 
-function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled, diffBase }) {
+function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled, diffBase, copyFormat, setCopyFormat }) {
   const { results } = data;
   const [selected, setSelected] = useState(new Set());
   const verseNums = useMemo(() => {
@@ -776,8 +857,8 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
         }
       });
     });
-    return formatVersesForShare(lines);
-  }, [selected, results, bookName, data.chap]);
+    return formatVersesForShare(lines, copyFormat);
+  }, [selected, results, bookName, data.chap, copyFormat]);
 
   const getSingleVerseText = useCallback((vNum) => {
     const lines = [];
@@ -788,8 +869,8 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
         lines.push({ ref: `[${vi?.label}] ${bookName} ${data.chap}:${vNum}`, text: stripTags(vd.bible_text) });
       }
     });
-    return formatVersesForShare(lines);
-  }, [results, bookName, data.chap]);
+    return formatVersesForShare(lines, copyFormat);
+  }, [results, bookName, data.chap, copyFormat]);
 
   useEffect(() => {
     const handler = () => {
@@ -810,7 +891,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
   return (
     <div style={S.resultCard}>
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
-      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large isTop />
+      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verseNums.length && verseNums.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -836,7 +917,13 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                       第 {vNum} 節
                     </a>
                     <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
-                    <CopyVerseButton getText={() => getSingleVerseText(vNum)} />
+                    <CopyVerseButton
+                      getText={() => {
+                        const sel = getSelectedText();
+                        return sel || getSingleVerseText(vNum);
+                      }}
+                      countLabel={selected.size > 0 ? `複製 ${selected.size} 節` : '複製本節'}
+                    />
                   </div>
                   <AnnotationEditor reference={reference} annotation={annotation} onChange={onAnnotationChange} />
                 </div>
@@ -861,7 +948,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
         })}
       </div>
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
-      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large />
+      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
     </div>
   );
@@ -869,7 +956,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
 
 const PAGE_SIZE = 50;
 
-function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled, diffBase }) {
+function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled, diffBase, copyFormat, setCopyFormat }) {
   const { results, keyword } = data;
   const [selected, setSelected] = useState(new Set());
   const [topCopied, setTopCopied] = useState(false);
@@ -917,8 +1004,8 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
         if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${getBookName(vo.localAbbrev)} ${vo.chap}:${vo.sec}`, text: stripTags(vd.bible_text) });
       });
     }
-    return formatVersesForShare(lines);
-  }, [selected, verses, results]);
+    return formatVersesForShare(lines, copyFormat);
+  }, [selected, verses, results, copyFormat]);
 
   const getSingleVerseTextForKeyword = useCallback((vo) => {
     const lines = [];
@@ -927,8 +1014,8 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
       const vd = res.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
       if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${getBookName(vo.localAbbrev)} ${vo.chap}:${vo.sec}`, text: stripTags(vd.bible_text) });
     });
-    return formatVersesForShare(lines);
-  }, [results]);
+    return formatVersesForShare(lines, copyFormat);
+  }, [results, copyFormat]);
 
   const handleTopCopy = useCallback(async () => {
     const lines = [];
@@ -939,13 +1026,13 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
         if (vd?.bible_text && vd.bible_text !== '--') lines.push({ ref: `[${vi?.label}] ${getBookName(vo.localAbbrev)} ${vo.chap}:${vo.sec}`, text: stripTags(vd.bible_text) });
       });
     }
-    const text = formatVersesForShare(lines);
+    const text = formatVersesForShare(lines, copyFormat);
     if (text) {
       await copyToClipboard(text);
       setTopCopied(true);
       window.setTimeout(() => setTopCopied(false), 2000);
     }
-  }, [verses, results]);
+  }, [verses, results, copyFormat]);
 
   useEffect(() => {
     const handler = () => {
@@ -985,7 +1072,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
           })}
         </div>
       </div>
-      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large isTop />
+      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verses.length && verses.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -1011,7 +1098,13 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
                       {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
                     </a>
                     <FhlLink abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} />
-                    <CopyVerseButton getText={() => getSingleVerseTextForKeyword(vo)} />
+                    <CopyVerseButton
+                      getText={() => {
+                        const sel = getSelectedText();
+                        return sel || getSingleVerseTextForKeyword(vo);
+                      }}
+                      countLabel={selected.size > 0 ? `複製 ${selected.size} 節` : '複製本節'}
+                    />
                   </div>
                   <AnnotationEditor reference={reference} annotation={annotation} onChange={onAnnotationChange} />
                 </div>
@@ -1025,7 +1118,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
                       <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="desktop-verse-num" style={{ color: '#1565c0', fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.9, textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
                         {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
                       </a>
-                      {vd ? <VerseText text={vd.bible_text} keyword={keyword} compareText={diffEnabled ? baseText : ''} /> : <span style={{ color: '#aaa' }}>--</span>}
+                      {vd ? <VerseText text={vd.bible_text} keyword={keyword} exactPhrase={Boolean(data.searchOptions?.exactPhrase)} compareText={diffEnabled ? baseText : ''} /> : <span style={{ color: '#aaa' }}>--</span>}
                     </div>
                   );
                 })}
@@ -1047,7 +1140,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
         </div>
       )}
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
-      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large />
+      <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
     </div>
   );
 }
@@ -1176,6 +1269,9 @@ export default function App() {
   const [history, setHistory] = usePersistentState(LS_KEYS.history, []);
   const [annotations, setAnnotations] = usePersistentState(LS_KEYS.annotations, {});
   const [bibleStructure, setBibleStructure] = useState(null);
+  const [bookmark, setBookmark] = usePersistentState(LS_KEYS.bookmark, null);
+  const [copyFormat, setCopyFormat] = usePersistentState(LS_KEYS.copyFormat, 'plain');
+  const [theme, setTheme] = usePersistentState(LS_KEYS.theme, 'light');
   const searchSeqRef = useRef(0);
 
   useEffect(() => {
@@ -1229,6 +1325,12 @@ export default function App() {
   useEffect(() => {
     if (initialUrlSearchedRef.current) return;
     const params = new URLSearchParams(window.location.search);
+    const resume = params.get('resume');
+    if (resume === '1' && bookmark) {
+      initialUrlSearchedRef.current = true;
+      handleSearch(bookmark.label, versions, {});
+      return;
+    }
     const q = params.get('q');
     if (!q) return;
     initialUrlSearchedRef.current = true;
@@ -1238,7 +1340,7 @@ export default function App() {
       : null;
     if (urlVersions && urlVersions.length > 0) setVersions(urlVersions);
     handleSearch(q, urlVersions && urlVersions.length > 0 ? urlVersions : versions, {});
-  }, [handleSearch, setVersions, versions]);
+  }, [handleSearch, setVersions, versions, bookmark]);
 
   useEffect(() => {
     if (!data) return;
@@ -1253,7 +1355,84 @@ export default function App() {
     if (next !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', next);
     }
-  }, [data, versions]);
+    if (data.mode === 'verse' && data.abbrev) {
+      setBookmark({
+        abbrev: data.abbrev,
+        chap: data.chap,
+        sec: data.sec || '',
+        label: `${getBookName(data.abbrev)} ${data.chap}${data.sec ? `:${data.sec}` : ''}`,
+        ts: new Date().toISOString(),
+      });
+    }
+  }, [data, versions, setBookmark]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = (document.activeElement?.tagName || '').toUpperCase();
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if (e.key === '/' && !inField) {
+        e.preventDefault();
+        document.getElementById('bible-search-input')?.focus();
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (inField) {
+          document.activeElement.blur();
+        } else if (data) {
+          setData(null);
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        return;
+      }
+      if (inField) return;
+      if (e.key === '?') {
+        e.preventDefault();
+        window.alert([
+          '鍵盤快速鍵',
+          '/  聚焦搜尋框',
+          'j  下一章 / 下一節',
+          'k  上一章 / 上一節',
+          'c  複製已勾選經文',
+          'Esc 清除/離開',
+          '?  顯示說明',
+        ].join('\n'));
+        return;
+      }
+      if (e.key === 'c') {
+        e.preventDefault();
+        document.dispatchEvent(new CustomEvent('global-copy'));
+        return;
+      }
+      if ((e.key === 'j' || e.key === 'k') && data?.mode === 'verse' && data.abbrev && bibleStructure) {
+        e.preventDefault();
+        const dir = e.key === 'j' ? 1 : -1;
+        const bookData = bibleStructure.find((b) => b.abbrev === data.abbrev);
+        if (!bookData) return;
+        const bookName = getBookName(data.abbrev);
+        const chapNum = parseInt(data.chap, 10);
+        const isSingleVerse = data.sec && !String(data.sec).includes('-');
+        if (isSingleVerse) {
+          const secNum = parseInt(data.sec, 10);
+          const totalVerses = bookData.chapters[chapNum - 1]?.length || 0;
+          const next = secNum + dir;
+          if (next >= 1 && next <= totalVerses) {
+            handleSearch(`${bookName} ${chapNum}:${next}`, versions, data.searchOptions || {});
+          }
+        } else {
+          const next = chapNum + dir;
+          if (next >= 1 && next <= bookData.chapters.length) {
+            handleSearch(`${bookName} ${next}`, versions, data.searchOptions || {});
+          }
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [data, bibleStructure, handleSearch, versions]);
 
   const updateAnnotation = useCallback((reference, patch) => {
     setAnnotations((prev) => {
@@ -1328,8 +1507,26 @@ export default function App() {
       <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 16px' }}>
         <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} diffBase={diffBase} setDiffBase={setDiffBase} />
         <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed />
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
           <InstallButton />
+          {bookmark && (
+            <button
+              type="button"
+              onClick={() => handleSearch(bookmark.label, versions, {})}
+              style={{ background: 'linear-gradient(145deg, #fb923c, #c2410c)', color: 'white', border: 'none', borderRadius: 999, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 3px 6px rgba(194,65,12,0.25)' }}
+              title={`上次讀到 ${bookmark.label} (${formatDateTime(bookmark.ts)})`}
+            >
+              繼續上次閱讀: {bookmark.label}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title="切換深色/淺色"
+            style={{ background: theme === 'dark' ? '#1e293b' : '#ffffff', color: theme === 'dark' ? '#f1f5f9' : '#1b5e20', border: '2px solid #a5d6a7', borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          >
+            {theme === 'dark' ? '☀ 淺色' : '🌙 深色'}
+          </button>
         </div>
         <UserLibrary
           history={history}
@@ -1355,6 +1552,8 @@ export default function App() {
             onAnnotationChange={updateAnnotation}
             diffEnabled={diffEnabled}
             diffBase={diffBase}
+            copyFormat={copyFormat}
+            setCopyFormat={setCopyFormat}
           />
         )}
         {!loading && data && data.mode === 'keyword' && (
@@ -1367,6 +1566,8 @@ export default function App() {
             onAnnotationChange={updateAnnotation}
             diffEnabled={diffEnabled}
             diffBase={diffBase}
+            copyFormat={copyFormat}
+            setCopyFormat={setCopyFormat}
           />
         )}
         <footer style={{ marginTop: 48, textAlign: 'center', color: '#66a96a', fontSize: 12, paddingBottom: 32 }}>
