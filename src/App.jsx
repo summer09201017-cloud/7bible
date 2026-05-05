@@ -28,6 +28,7 @@ const LS_KEYS = {
   versions: 'bible-tool-versions-v1',
   fontSize: 'bible-tool-font-size-v1',
   diffEnabled: 'bible-tool-diff-enabled-v1',
+  diffBase: 'bible-tool-diff-base-v1',
 };
 
 const FHL_ENGS_BY_LOCAL = {
@@ -334,7 +335,7 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
   );
 }
 
-function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure }) {
+function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure, diffEnabled, setDiffEnabled, diffBase, setDiffBase }) {
   const [query, setQuery] = useState('');
   const [selBook, setSelBook] = useState('');
   const [selChap, setSelChap] = useState('');
@@ -472,10 +473,28 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure 
         ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: showAdvanced ? 12 : 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: showAdvanced ? 12 : 0 }}>
         <button type="button" onClick={() => setShowAdvanced((v) => !v)} style={S.smallBtn}>
           {showAdvanced ? '收合進階搜尋' : '進階搜尋'}
         </button>
+        {typeof diffEnabled === 'boolean' && (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', fontWeight: 700, cursor: 'pointer' }}>
+            <input type="checkbox" checked={diffEnabled} onChange={(e) => setDiffEnabled(e.target.checked)} />
+            差異高亮
+          </label>
+        )}
+        {diffEnabled && versions.length >= 2 && (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#374151', fontWeight: 700 }}>
+            比較基準
+            <select value={diffBase || ''} onChange={(e) => setDiffBase(e.target.value)} style={{ ...S.select, padding: '4px 8px', fontSize: 12, minWidth: 120, flex: 'none' }}>
+              <option value="">自動 (第一個有內容)</option>
+              {versions.map((vid) => {
+                const vi = VERSIONS.find((v) => v.id === vid);
+                return <option key={vid} value={vid}>{vi?.label || vid}</option>;
+              })}
+            </select>
+          </label>
+        )}
       </div>
 
       {showAdvanced && (
@@ -588,7 +607,7 @@ const btnFontSize = {
   minWidth: 40,
 };
 
-function FontSizeControl({ fontSize, setFontSize, fixed, diffEnabled, setDiffEnabled }) {
+function FontSizeControl({ fontSize, setFontSize, fixed }) {
   const content = (
     <>
       <span style={{ fontSize: 13, color: '#555', fontWeight: 700 }}>字型大小</span>
@@ -596,12 +615,6 @@ function FontSizeControl({ fontSize, setFontSize, fixed, diffEnabled, setDiffEna
       <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
       <button type="button" onClick={() => setFontSize((s) => Math.min(40, s + 1))} style={btnFontSize} title="放大">A+</button>
       <button type="button" onClick={() => setFontSize(15)} style={{ ...btnFontSize, fontSize: 12, padding: '6px 10px' }} title="重置">重置</button>
-      {typeof diffEnabled === 'boolean' && (
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', fontWeight: 700 }}>
-          <input type="checkbox" checked={diffEnabled} onChange={(e) => setDiffEnabled(e.target.checked)} />
-          差異高亮
-        </label>
-      )}
     </>
   );
 
@@ -624,14 +637,19 @@ function getRecordForVerse(result, chap, sec, chineses) {
   return result.record?.find((r) => r.sec === sec && (!chap || r.chap === chap) && (!chineses || r.chineses === chineses));
 }
 
-function getBaseTextForVerse(results, chap, sec, chineses) {
+function getBaseTextForVerse(results, chap, sec, chineses, baseVersion) {
+  if (baseVersion) {
+    const baseResult = results.find((r) => r.version === baseVersion);
+    const baseRecord = baseResult ? getRecordForVerse(baseResult, chap, sec, chineses) : null;
+    if (baseRecord?.bible_text && baseRecord.bible_text !== '--') return baseRecord.bible_text;
+  }
   const record = results
     .map((result) => getRecordForVerse(result, chap, sec, chineses))
     .find((r) => r?.bible_text && r.bible_text !== '--');
   return record ? record.bible_text : '';
 }
 
-function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled }) {
+function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled, diffBase }) {
   const { results } = data;
   const [selected, setSelected] = useState(new Set());
   const verseNums = useMemo(() => {
@@ -698,7 +716,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
         {verseNums.map((vNum) => {
           const reference = makeReference(data.abbrev, Number(data.chap), vNum);
           const annotation = annotations[getVerseKey(reference)];
-          const baseText = getBaseTextForVerse(results, null, vNum, null);
+          const baseText = getBaseTextForVerse(results, null, vNum, null, diffBase);
           const rowBackground = selected.has(vNum) ? '#e8f5e930' : softColor(annotation?.color);
           return (
             <div key={vNum} style={{ borderBottom: '1px solid #e8f5e9', background: rowBackground, transition: 'background 0.15s' }}>
@@ -740,10 +758,13 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
   );
 }
 
-function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled }) {
+const PAGE_SIZE = 50;
+
+function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled, diffBase }) {
   const { results, keyword } = data;
   const [selected, setSelected] = useState(new Set());
   const [topCopied, setTopCopied] = useState(false);
+  const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const verses = useMemo(() => {
     const verseMap = new Map();
     results.forEach((res) => {
@@ -762,7 +783,13 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
   const totalCount = results.reduce((sum, result) => sum + (Number.isInteger(result.matchedCount) ? result.matchedCount : (result.record?.length || 0)), 0);
   const cols = results.length;
 
-  useEffect(() => setSelected(new Set()), [data]);
+  useEffect(() => {
+    setSelected(new Set());
+    setDisplayLimit(PAGE_SIZE);
+  }, [data]);
+
+  const visibleVerses = useMemo(() => verses.slice(0, displayLimit), [verses, displayLimit]);
+  const hasMore = verses.length > displayLimit;
 
   const toggleVerse = (key) => {
     const next = new Set(selected);
@@ -850,10 +877,10 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
         })}
       </div>
       <div>
-        {verses.map((vo) => {
+        {visibleVerses.map((vo) => {
           const reference = makeReference(vo.localAbbrev, vo.chap, vo.sec);
           const annotation = annotations[getVerseKey(reference)];
-          const baseText = getBaseTextForVerse(results, vo.chap, vo.sec, vo.chineses);
+          const baseText = getBaseTextForVerse(results, vo.chap, vo.sec, vo.chineses, diffBase);
           const rowBackground = selected.has(vo.key) ? '#fef9c340' : softColor(annotation?.color);
           return (
             <div key={vo.key} style={{ borderBottom: '1px solid #e8f5e9', background: rowBackground, transition: 'background 0.15s' }}>
@@ -887,6 +914,18 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
           );
         })}
       </div>
+      {hasMore && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 16px', background: '#f7fbef', borderTop: '1px solid #c8e6c9' }}>
+          <button
+            type="button"
+            onClick={() => setDisplayLimit((n) => n + PAGE_SIZE)}
+            className="btn-active-effect"
+            style={{ ...S.btnLine, padding: '10px 24px', fontSize: 14 }}
+          >
+            載入更多 ({verses.length - displayLimit} 節未顯示)
+          </button>
+        </div>
+      )}
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
       <ActionBar getSelectedText={getSelectedText} selectedCount={selected.size} large />
     </div>
@@ -926,8 +965,8 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
           <input ref={fileInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={handleFile} />
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-        <section style={{ background: '#ffffffcc', border: '1px solid #d9ead3', borderRadius: 10, padding: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(0, 1fr))', gap: 14 }}>
+        <section style={{ background: '#ffffffcc', border: '1px solid #d9ead3', borderRadius: 10, padding: 12, minWidth: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <h3 style={{ margin: 0, color: '#2e7d32', fontSize: 15 }}>查詢歷史</h3>
             {history.length > 0 && <button type="button" onClick={onClearHistory} style={S.dangerBtn}>清空</button>}
@@ -935,11 +974,11 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
           {history.length === 0 && <p style={{ margin: 0, color: '#6b7280', fontSize: 13 }}>查詢後會自動保留最近紀錄。</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
             {history.slice(0, 12).map((item) => (
-              <div key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: '#fff' }}>
-                <button type="button" onClick={() => onRunHistory(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
+              <div key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: '#fff', minWidth: 0, overflow: 'hidden' }}>
+                <button type="button" onClick={() => onRunHistory(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                   <strong style={{ color: '#111827', fontSize: 14 }}>{item.query}</strong>
                   <div style={{ color: '#6b7280', fontSize: 12, marginTop: 3 }}>
-                    {formatDateTime(item.ts)} · {item.resultCount} 筆 · {item.versions?.join(', ')}
+                    {formatDateTime(item.ts)} · {item.resultCount} 筆
                   </div>
                 </button>
                 <button type="button" onClick={() => onDeleteHistory(item.id)} style={{ ...S.dangerBtn, marginTop: 6 }}>刪除</button>
@@ -947,16 +986,16 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
             ))}
           </div>
         </section>
-        <section style={{ background: '#ffffffcc', border: '1px solid #d9ead3', borderRadius: 10, padding: 12 }}>
+        <section style={{ background: '#ffffffcc', border: '1px solid #d9ead3', borderRadius: 10, padding: 12, minWidth: 0, overflow: 'hidden' }}>
           <h3 style={{ margin: '0 0 8px', color: '#2e7d32', fontSize: 15 }}>收藏 / 筆記 / 螢光筆</h3>
           {annotationItems.length === 0 && <p style={{ margin: 0, color: '#6b7280', fontSize: 13 }}>在經文旁可收藏、標色與寫筆記。</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
             {annotationItems.slice(0, 30).map((item) => (
-              <div key={item.key} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: item.color || '#fff' }}>
-                <button type="button" onClick={() => onRunAnnotation(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
+              <div key={item.key} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: item.color || '#fff', minWidth: 0, overflow: 'hidden' }}>
+                <button type="button" onClick={() => onRunAnnotation(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                   <strong style={{ color: '#111827', fontSize: 14 }}>{item.label}</strong>
                   <div style={{ color: '#4b5563', fontSize: 12, marginTop: 3 }}>{item.favorite ? '已收藏' : '已標記'} · {formatDateTime(item.updatedAt)}</div>
-                  {item.note && <p style={{ margin: '6px 0 0', color: '#374151', fontSize: 13, lineHeight: 1.45 }}>{item.note}</p>}
+                  {item.note && <p style={{ margin: '6px 0 0', color: '#374151', fontSize: 13, lineHeight: 1.45, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{item.note}</p>}
                 </button>
                 <button type="button" onClick={() => onDeleteAnnotation(item)} style={{ ...S.dangerBtn, marginTop: 6 }}>刪除</button>
               </div>
@@ -1013,9 +1052,11 @@ export default function App() {
   const [versions, setVersions] = usePersistentState(LS_KEYS.versions, ['unv', 'niv', 'esv', 'ncv', 'lzz']);
   const [fontSize, setFontSize] = usePersistentState(LS_KEYS.fontSize, 15);
   const [diffEnabled, setDiffEnabled] = usePersistentState(LS_KEYS.diffEnabled, true);
+  const [diffBase, setDiffBase] = usePersistentState(LS_KEYS.diffBase, '');
   const [history, setHistory] = usePersistentState(LS_KEYS.history, []);
   const [annotations, setAnnotations] = usePersistentState(LS_KEYS.annotations, {});
   const [bibleStructure, setBibleStructure] = useState(null);
+  const searchSeqRef = useRef(0);
 
   useEffect(() => {
     fetch('/data/unv.json')
@@ -1023,6 +1064,36 @@ export default function App() {
       .then((structure) => setBibleStructure(structure))
       .catch((err) => console.error('Error loading bible structure:', err));
   }, []);
+
+  const initialUrlSearchedRef = useRef(false);
+  useEffect(() => {
+    if (initialUrlSearchedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');
+    if (!q) return;
+    initialUrlSearchedRef.current = true;
+    const vParam = params.get('v');
+    const urlVersions = vParam
+      ? vParam.split(',').map((s) => s.trim()).filter((s) => VERSIONS.find((vv) => vv.id === s))
+      : null;
+    if (urlVersions && urlVersions.length > 0) setVersions(urlVersions);
+    handleSearch(q, urlVersions && urlVersions.length > 0 ? urlVersions : versions, {});
+  }, [handleSearch, setVersions, versions]);
+
+  useEffect(() => {
+    if (!data) return;
+    const params = new URLSearchParams();
+    const q = data.mode === 'verse'
+      ? `${getBookName(data.abbrev)} ${data.chap}${data.sec ? `:${data.sec}` : ''}`
+      : data.keyword;
+    if (!q) return;
+    params.set('q', q);
+    params.set('v', versions.join(','));
+    const next = `${window.location.pathname}?${params.toString()}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, '', next);
+    }
+  }, [data, versions]);
 
   const addHistory = useCallback((query, selectedVersions, searchOptions, result) => {
     const resultCount = result.mode === 'keyword'
@@ -1046,18 +1117,21 @@ export default function App() {
 
   const handleSearch = useCallback(async (query, selectedVersions = versions, searchOptions = {}) => {
     const t0 = performance.now();
+    const seq = ++searchSeqRef.current;
     setLoading(true);
     setError(null);
     try {
       const res = await fetchBible(query, selectedVersions, searchOptions);
+      if (seq !== searchSeqRef.current) return;
       res.timeMs = Math.round(performance.now() - t0);
       setData(res);
       addHistory(query.trim(), selectedVersions, searchOptions, res);
     } catch (err) {
+      if (seq !== searchSeqRef.current) return;
       setError(err.message);
       setData(null);
     } finally {
-      setLoading(false);
+      if (seq === searchSeqRef.current) setLoading(false);
     }
   }, [versions, addHistory]);
 
@@ -1132,8 +1206,8 @@ export default function App() {
   return (
     <div id="top" style={{ ...S.bg, padding: 0, paddingTop: 56, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 16px' }}>
-        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} />
-        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} />
+        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} diffBase={diffBase} setDiffBase={setDiffBase} />
+        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed />
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
           <InstallButton />
         </div>
@@ -1160,6 +1234,7 @@ export default function App() {
             annotations={annotations}
             onAnnotationChange={updateAnnotation}
             diffEnabled={diffEnabled}
+            diffBase={diffBase}
           />
         )}
         {!loading && data && data.mode === 'keyword' && (
@@ -1171,6 +1246,7 @@ export default function App() {
             annotations={annotations}
             onAnnotationChange={updateAnnotation}
             diffEnabled={diffEnabled}
+            diffBase={diffBase}
           />
         )}
         <footer style={{ marginTop: 48, textAlign: 'center', color: '#66a96a', fontSize: 12, paddingBottom: 32 }}>
