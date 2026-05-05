@@ -1,15 +1,16 @@
 import { findLocalAbbrev, bookMap } from './bible_books';
 
 // Version details for UI - order = display order (left to right)
+// lang: 'zh' / 'en' - 用於差異高亮的同語系判斷
 export const VERSIONS = [
-  { id: 'unv', label: '和合本 (CUV)' },
-  { id: 'niv', label: 'NIV' },
-  { id: 'esv', label: 'ESV' },
-  { id: 'web', label: 'WEB' },
-  { id: 'ncv', label: '新譯本 (NCV)' },
-  { id: 'lzz', label: '呂振中' },
-  { id: 'asv', label: 'ASV' },
-  { id: 'kjv', label: 'KJV' },
+  { id: 'unv', label: '和合本 (CUV)', lang: 'zh' },
+  { id: 'niv', label: 'NIV', lang: 'en' },
+  { id: 'esv', label: 'ESV', lang: 'en' },
+  { id: 'web', label: 'WEB', lang: 'en' },
+  { id: 'ncv', label: '新譯本 (NCV)', lang: 'zh' },
+  { id: 'lzz', label: '呂振中', lang: 'zh' },
+  { id: 'asv', label: 'ASV', lang: 'en' },
+  { id: 'kjv', label: 'KJV', lang: 'en' },
 ];
 
 const STRIP_SPACE_VERSIONS = ['unv'];

@@ -483,18 +483,51 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
             差異高亮
           </label>
         )}
-        {diffEnabled && versions.length >= 2 && (
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#374151', fontWeight: 700 }}>
-            比較基準
-            <select value={diffBase || ''} onChange={(e) => setDiffBase(e.target.value)} style={{ ...S.select, padding: '4px 8px', fontSize: 12, minWidth: 120, flex: 'none' }}>
-              <option value="">自動 (第一個有內容)</option>
-              {versions.map((vid) => {
-                const vi = VERSIONS.find((v) => v.id === vid);
-                return <option key={vid} value={vid}>{vi?.label || vid}</option>;
-              })}
-            </select>
-          </label>
-        )}
+        {diffEnabled && versions.length >= 2 && (() => {
+          const selectedLangs = new Set(versions.map((vid) => VERSIONS.find((v) => v.id === vid)?.lang).filter(Boolean));
+          const baseLang = diffBase ? VERSIONS.find((v) => v.id === diffBase)?.lang : null;
+          const skippedCount = baseLang ? versions.filter((vid) => {
+            if (vid === diffBase) return false;
+            const l = VERSIONS.find((v) => v.id === vid)?.lang;
+            return l && l !== baseLang;
+          }).length : 0;
+          const showMixedHint = !diffBase && selectedLangs.size > 1;
+          const zhVersions = versions.filter((vid) => VERSIONS.find((v) => v.id === vid)?.lang === 'zh');
+          const enVersions = versions.filter((vid) => VERSIONS.find((v) => v.id === vid)?.lang === 'en');
+          const renderOption = (vid) => {
+            const vi = VERSIONS.find((v) => v.id === vid);
+            const tag = vi?.lang === 'zh' ? '中' : vi?.lang === 'en' ? '英' : '';
+            return <option key={vid} value={vid}>{tag ? `[${tag}] ` : ''}{vi?.label || vid}</option>;
+          };
+          return (
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#374151', fontWeight: 700, flexWrap: 'wrap' }}>
+              比較基準
+              <select value={diffBase || ''} onChange={(e) => setDiffBase(e.target.value)} style={{ ...S.select, padding: '4px 8px', fontSize: 12, minWidth: 140, flex: 'none' }}>
+                <option value="">自動 (第一個有內容)</option>
+                {zhVersions.length > 0 && (
+                  <optgroup label="中文譯本">
+                    {zhVersions.map(renderOption)}
+                  </optgroup>
+                )}
+                {enVersions.length > 0 && (
+                  <optgroup label="英文譯本">
+                    {enVersions.map(renderOption)}
+                  </optgroup>
+                )}
+              </select>
+              {skippedCount > 0 && (
+                <span title="跨語系譯本不會做 token 差異比較" style={{ fontSize: 11, color: '#b45309', fontWeight: 600, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 5, padding: '1px 6px' }}>
+                  ⚠ 跨語系 {skippedCount} 個略過
+                </span>
+              )}
+              {showMixedHint && (
+                <span title="自動模式下跨語系譯本互比無意義, 建議指定基準" style={{ fontSize: 11, color: '#6b7280', fontWeight: 500 }}>
+                  · 中英混選, 建議指定基準
+                </span>
+              )}
+            </label>
+          );
+        })()}
       </div>
 
       {showAdvanced && (
