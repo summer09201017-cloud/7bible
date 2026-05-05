@@ -1065,36 +1065,6 @@ export default function App() {
       .catch((err) => console.error('Error loading bible structure:', err));
   }, []);
 
-  const initialUrlSearchedRef = useRef(false);
-  useEffect(() => {
-    if (initialUrlSearchedRef.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const q = params.get('q');
-    if (!q) return;
-    initialUrlSearchedRef.current = true;
-    const vParam = params.get('v');
-    const urlVersions = vParam
-      ? vParam.split(',').map((s) => s.trim()).filter((s) => VERSIONS.find((vv) => vv.id === s))
-      : null;
-    if (urlVersions && urlVersions.length > 0) setVersions(urlVersions);
-    handleSearch(q, urlVersions && urlVersions.length > 0 ? urlVersions : versions, {});
-  }, [handleSearch, setVersions, versions]);
-
-  useEffect(() => {
-    if (!data) return;
-    const params = new URLSearchParams();
-    const q = data.mode === 'verse'
-      ? `${getBookName(data.abbrev)} ${data.chap}${data.sec ? `:${data.sec}` : ''}`
-      : data.keyword;
-    if (!q) return;
-    params.set('q', q);
-    params.set('v', versions.join(','));
-    const next = `${window.location.pathname}?${params.toString()}`;
-    if (next !== `${window.location.pathname}${window.location.search}`) {
-      window.history.replaceState(null, '', next);
-    }
-  }, [data, versions]);
-
   const addHistory = useCallback((query, selectedVersions, searchOptions, result) => {
     const resultCount = result.mode === 'keyword'
       ? new Set(result.results.flatMap((r) => r.record?.map((v) => `${v.localAbbrev}:${v.chap}:${v.sec}`) || [])).size
@@ -1134,6 +1104,36 @@ export default function App() {
       if (seq === searchSeqRef.current) setLoading(false);
     }
   }, [versions, addHistory]);
+
+  const initialUrlSearchedRef = useRef(false);
+  useEffect(() => {
+    if (initialUrlSearchedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');
+    if (!q) return;
+    initialUrlSearchedRef.current = true;
+    const vParam = params.get('v');
+    const urlVersions = vParam
+      ? vParam.split(',').map((s) => s.trim()).filter((s) => VERSIONS.find((vv) => vv.id === s))
+      : null;
+    if (urlVersions && urlVersions.length > 0) setVersions(urlVersions);
+    handleSearch(q, urlVersions && urlVersions.length > 0 ? urlVersions : versions, {});
+  }, [handleSearch, setVersions, versions]);
+
+  useEffect(() => {
+    if (!data) return;
+    const params = new URLSearchParams();
+    const q = data.mode === 'verse'
+      ? `${getBookName(data.abbrev)} ${data.chap}${data.sec ? `:${data.sec}` : ''}`
+      : data.keyword;
+    if (!q) return;
+    params.set('q', q);
+    params.set('v', versions.join(','));
+    const next = `${window.location.pathname}?${params.toString()}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, '', next);
+    }
+  }, [data, versions]);
 
   const updateAnnotation = useCallback((reference, patch) => {
     setAnnotations((prev) => {
