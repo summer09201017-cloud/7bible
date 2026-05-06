@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bible-app-v8';
+const CACHE_NAME = 'bible-app-v9';
 
 // App shell only - 經文資料改為懶快取 (首次使用時才存)
 const STATIC_ASSETS = [
