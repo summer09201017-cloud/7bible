@@ -86,6 +86,110 @@ const S = {
   textarea: { width: '100%', minHeight: 72, resize: 'vertical', border: '1px solid var(--border-strong)', borderRadius: 8, padding: 8, fontSize: 13, lineHeight: 1.5, outline: 'none', background: 'var(--input-bg)', color: 'var(--page-text)' },
 };
 
+const THEME_VARS = {
+  light: {
+    '--app-bg': 'linear-gradient(135deg, #e8f5e9 0%, #f7fbef 50%, #e0f2e1 100%)',
+    '--page-text': '#1f2937',
+    '--heading-text': '#1b5e20',
+    '--subtle-text': '#2e7d32',
+    '--muted-text': '#6b7280',
+    '--soft-text': '#555',
+    '--link-text': '#1565c0',
+    '--surface-bg': 'linear-gradient(145deg, #ffffff, #f7fbef)',
+    '--surface-solid': '#ffffff',
+    '--panel-bg': '#ffffffcc',
+    '--input-bg': '#ffffff',
+    '--pill-inactive-bg': '#ffffff',
+    '--pill-inactive-text': '#555',
+    '--table-header-bg': 'linear-gradient(145deg, #e8f5e9, #c8e6c9)',
+    '--action-bar-bg': 'linear-gradient(to right, #e8f5e9, #f7fbef)',
+    '--stats-bar-bg': 'linear-gradient(135deg, #fff9c4, #f1f8e9)',
+    '--topbar-bg': 'linear-gradient(135deg, #e8f5e9 0%, #f7fbef 50%, #e0f2e1 100%)',
+    '--mobile-checkbox-bg': 'linear-gradient(to right, #e8f5e9, #f9fff5)',
+    '--mobile-verse-bg': '#ffffff',
+    '--border-soft': '#c8e6c9',
+    '--border-strong': '#a5d6a7',
+    '--border-muted': '#e5e7eb',
+    '--row-border': '#e8f5e9',
+    '--progress-track': '#c8e6c9',
+    '--selected-row-bg': '#e8f5e930',
+    '--keyword-selected-row-bg': '#fef9c340',
+    '--warning-text': '#b45309',
+    '--warning-strong-text': '#92400e',
+    '--warning-bg': '#fffbeb',
+    '--warning-border': '#fcd34d',
+    '--danger-bg': '#ffebee',
+    '--danger-border': '#ef9a9a',
+    '--danger-text': '#b71c1c',
+    '--card-shadow': '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+    '--result-shadow': '0 6px 20px rgba(76,175,80,0.08)',
+    '--topbar-shadow': '0 2px 12px rgba(76,175,80,0.2)',
+    '--scrollbar-thumb': '#a5d6a7',
+    '--scrollbar-thumb-hover': '#66bb6a',
+    '--version-unv': '#1a5276',
+    '--version-niv': '#0277bd',
+    '--version-esv': '#7b241c',
+    '--version-web': '#1e8449',
+    '--version-ncv': '#6c3483',
+    '--version-lzz': '#b9770e',
+    '--version-asv': '#2471a3',
+    '--version-kjv': '#a04000',
+  },
+  dark: {
+    '--app-bg': 'linear-gradient(135deg, #0f1713 0%, #172119 52%, #101814 100%)',
+    '--page-text': '#dbe8d6',
+    '--heading-text': '#bbf7d0',
+    '--subtle-text': '#86efac',
+    '--muted-text': '#a8b8a3',
+    '--soft-text': '#c2d1bd',
+    '--link-text': '#93c5fd',
+    '--surface-bg': 'linear-gradient(145deg, #19251d, #101913)',
+    '--surface-solid': '#121b15',
+    '--panel-bg': '#162119dd',
+    '--input-bg': '#0f1713',
+    '--pill-inactive-bg': '#101913',
+    '--pill-inactive-text': '#cbdac6',
+    '--table-header-bg': 'linear-gradient(145deg, #1d2d22, #142018)',
+    '--action-bar-bg': 'linear-gradient(to right, #17251b, #101913)',
+    '--stats-bar-bg': 'linear-gradient(135deg, #262915, #132018)',
+    '--topbar-bg': 'linear-gradient(135deg, #101913 0%, #17251b 55%, #0f1713 100%)',
+    '--mobile-checkbox-bg': 'linear-gradient(to right, #17251b, #101913)',
+    '--mobile-verse-bg': '#0f1713',
+    '--border-soft': '#2f523a',
+    '--border-strong': '#4f8a5c',
+    '--border-muted': '#2b3d31',
+    '--row-border': '#233a2a',
+    '--progress-track': '#2b4633',
+    '--selected-row-bg': '#315c3b55',
+    '--keyword-selected-row-bg': '#5f4a1855',
+    '--warning-text': '#fde68a',
+    '--warning-strong-text': '#facc15',
+    '--warning-bg': '#2b2410',
+    '--warning-border': '#7c641d',
+    '--danger-bg': '#321616',
+    '--danger-border': '#7f1d1d',
+    '--danger-text': '#fecaca',
+    '--card-shadow': '0 10px 28px rgba(0,0,0,0.28), 0 2px 10px rgba(0,0,0,0.18)',
+    '--result-shadow': '0 8px 24px rgba(0,0,0,0.22)',
+    '--topbar-shadow': '0 2px 14px rgba(0,0,0,0.3)',
+    '--scrollbar-thumb': '#4f8a5c',
+    '--scrollbar-thumb-hover': '#86efac',
+    '--version-unv': '#93c5fd',
+    '--version-niv': '#7dd3fc',
+    '--version-esv': '#fca5a5',
+    '--version-web': '#86efac',
+    '--version-ncv': '#d8b4fe',
+    '--version-lzz': '#fcd34d',
+    '--version-asv': '#bae6fd',
+    '--version-kjv': '#fdba74',
+  },
+};
+
+const THEME_META_COLORS = {
+  light: '#e8f5e9',
+  dark: '#101913',
+};
+
 function readStorage(key, fallback) {
   try {
     const value = window.localStorage.getItem(key);
@@ -1272,6 +1376,7 @@ export default function App() {
   const [bookmark, setBookmark] = usePersistentState(LS_KEYS.bookmark, null);
   const [copyFormat, setCopyFormat] = usePersistentState(LS_KEYS.copyFormat, 'plain');
   const [theme, setTheme] = usePersistentState(LS_KEYS.theme, 'light');
+  const themeVars = useMemo(() => THEME_VARS[theme] || THEME_VARS.light, [theme]);
   const searchSeqRef = useRef(0);
 
   useEffect(() => {
@@ -1368,6 +1473,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.body.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_META_COLORS[theme] || THEME_META_COLORS.light);
   }, [theme]);
 
   useEffect(() => {
@@ -1503,7 +1610,7 @@ export default function App() {
   }, [setHistory, setAnnotations]);
 
   return (
-    <div id="top" style={{ ...S.bg, padding: 0, paddingTop: 56, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+    <div id="top" data-theme={theme} style={{ ...themeVars, ...S.bg, padding: 0, paddingTop: 56, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 16px' }}>
         <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} diffBase={diffBase} setDiffBase={setDiffBase} />
         <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed />
