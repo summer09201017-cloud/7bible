@@ -3,14 +3,14 @@ import { fetchBible, VERSIONS } from './api';
 import { bookMap } from './bible_books';
 
 const VERSION_COLORS = {
-  unv: '#1a5276',
-  niv: '#0277bd',
-  esv: '#7b241c',
-  web: '#1e8449',
-  ncv: '#6c3483',
-  lzz: '#b9770e',
-  asv: '#2471a3',
-  kjv: '#a04000',
+  unv: 'var(--version-unv)',
+  niv: 'var(--version-niv)',
+  esv: 'var(--version-esv)',
+  web: 'var(--version-web)',
+  ncv: 'var(--version-ncv)',
+  lzz: 'var(--version-lzz)',
+  asv: 'var(--version-asv)',
+  kjv: 'var(--version-kjv)',
 };
 
 const HIGHLIGHT_COLORS = [
@@ -64,9 +64,9 @@ const FHL_ENGS_BY_LOCAL = {
 };
 
 const S = {
-  bg: { background: 'linear-gradient(135deg, #e8f5e9 0%, #f7fbef 50%, #e0f2e1 100%)', minHeight: '100vh' },
-  card: { background: 'linear-gradient(145deg, #ffffff, #f7fbef)', boxShadow: '0 8px 24px rgba(76,175,80,0.12), 0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #c8e6c9', borderRadius: '14px' },
-  input: { background: '#ffffff', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)', border: '2px solid #a5d6a7', borderRadius: '10px' },
+  bg: { background: 'var(--app-bg)', color: 'var(--page-text)', minHeight: '100vh' },
+  card: { background: 'var(--surface-bg)', boxShadow: 'var(--card-shadow)', border: '1px solid var(--border-soft)', borderRadius: '14px' },
+  input: { background: 'var(--input-bg)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)', border: '2px solid var(--border-strong)', borderRadius: '10px', color: 'var(--page-text)' },
   btnSearch: { background: 'linear-gradient(145deg, #d32f2f, #9f1c1c)', boxShadow: '0 4px 8px rgba(183,28,28,0.25)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', width: '100%' },
   btnCopy: { background: 'linear-gradient(145deg, #1e88e5, #0d47a1)', boxShadow: '0 3px 6px rgba(13,71,161,0.25)', borderRadius: '9px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
   btnCopied: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', boxShadow: '0 3px 6px rgba(46,125,50,0.25)', borderRadius: '9px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
@@ -74,16 +74,16 @@ const S = {
   btnEmail: { background: 'linear-gradient(145deg, #fb8c00, #e65100)', boxShadow: '0 3px 6px rgba(230,81,0,0.25)', borderRadius: '9px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
   btnInstall: { background: 'linear-gradient(145deg, #6d4cff, #4527a0)', boxShadow: '0 4px 8px rgba(69,39,160,0.25)', borderRadius: '10px', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer' },
   pillActive: { background: 'linear-gradient(145deg, #43a047, #2e7d32)', color: 'white', border: '1px solid #2e7d32', boxShadow: '0 3px 8px rgba(46,125,50,0.25)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
-  pillInactive: { background: '#ffffff', color: '#555', border: '1px solid #cfd8dc', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
-  tableHeader: { background: 'linear-gradient(145deg, #e8f5e9, #c8e6c9)', borderBottom: '1px solid #a5d6a7' },
-  actionBar: { background: 'linear-gradient(to right, #e8f5e9, #f7fbef)', borderTop: '1px solid #c8e6c9' },
-  resultCard: { background: '#ffffff', boxShadow: '0 6px 20px rgba(76,175,80,0.08)', borderTop: '1px solid #c8e6c9', borderBottom: '1px solid #c8e6c9', borderRadius: 0, overflow: 'hidden' },
+  pillInactive: { background: 'var(--pill-inactive-bg)', color: 'var(--pill-inactive-text)', border: '1px solid var(--border-muted)', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderRadius: '999px', fontWeight: 600, cursor: 'pointer', userSelect: 'none', transition: 'all 0.2s' },
+  tableHeader: { background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border-strong)' },
+  actionBar: { background: 'var(--action-bar-bg)', borderTop: '1px solid var(--border-soft)' },
+  resultCard: { background: 'var(--surface-solid)', boxShadow: 'var(--result-shadow)', borderTop: '1px solid var(--border-soft)', borderBottom: '1px solid var(--border-soft)', borderRadius: 0, overflow: 'hidden' },
   checkbox: { width: 18, height: 18, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0 },
-  statsBar: { background: 'linear-gradient(135deg, #fff9c4, #f1f8e9)', borderBottom: '1px solid #c8e6c9' },
-  select: { background: '#ffffff', border: '2px solid #a5d6a7', borderRadius: '9px', padding: '10px 12px', fontSize: 14, outline: 'none', color: '#1b5e20', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 130 },
-  smallBtn: { border: '1px solid #a5d6a7', background: '#ffffff', color: '#1b5e20', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  dangerBtn: { border: '1px solid #ef9a9a', background: '#ffebee', color: '#b71c1c', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  textarea: { width: '100%', minHeight: 72, resize: 'vertical', border: '1px solid #a5d6a7', borderRadius: 8, padding: 8, fontSize: 13, lineHeight: 1.5, outline: 'none' },
+  statsBar: { background: 'var(--stats-bar-bg)', borderBottom: '1px solid var(--border-soft)' },
+  select: { background: 'var(--input-bg)', border: '2px solid var(--border-strong)', borderRadius: '9px', padding: '10px 12px', fontSize: 14, outline: 'none', color: 'var(--heading-text)', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 130 },
+  smallBtn: { border: '1px solid var(--border-strong)', background: 'var(--input-bg)', color: 'var(--heading-text)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  dangerBtn: { border: '1px solid var(--danger-border)', background: 'var(--danger-bg)', color: 'var(--danger-text)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  textarea: { width: '100%', minHeight: 72, resize: 'vertical', border: '1px solid var(--border-strong)', borderRadius: 8, padding: 8, fontSize: 13, lineHeight: 1.5, outline: 'none', background: 'var(--input-bg)', color: 'var(--page-text)' },
 };
 
 function readStorage(key, fallback) {
@@ -322,7 +322,7 @@ function FhlLink({ abbrev, chap, sec }) {
   const url = getFhlCommentaryUrl(abbrev, chap, sec);
   if (!url) return null;
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛站註釋資料" style={{ color: '#b45309', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid #fcd34d', borderRadius: 5, backgroundColor: '#fffbeb', fontWeight: 700, display: 'inline-block' }}>
+    <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛站註釋資料" style={{ color: 'var(--warning-text)', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid var(--warning-border)', borderRadius: 5, backgroundColor: 'var(--warning-bg)', fontWeight: 700, display: 'inline-block' }}>
       註釋
     </a>
   );
@@ -344,8 +344,8 @@ function ActionBar({ getSelectedText, selectedCount, large, isTop, copyFormat, s
 
   return (
     <div style={{ ...S.actionBar, padding: '14px 16px', position: 'sticky', bottom: isTop ? 'auto' : 0, top: isTop ? 44 : 'auto', zIndex: 9, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-      <span style={{ fontSize: large ? 15 : 12, color: '#555', marginRight: 4, whiteSpace: 'nowrap' }}>
-        已選 <strong style={{ color: '#2e7d32' }}>{selectedCount}</strong> 節
+      <span style={{ fontSize: large ? 15 : 12, color: 'var(--soft-text)', marginRight: 4, whiteSpace: 'nowrap' }}>
+        已選 <strong style={{ color: 'var(--subtle-text)' }}>{selectedCount}</strong> 節
       </span>
       <button type="button" onClick={handleCopy} disabled={disabled} className="btn-active-effect" style={{ ...(copied ? S.btnCopied : S.btnCopy), ...disabledStyle, ...copySize, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         {copied ? '已複製' : '複製經文'}
@@ -355,7 +355,7 @@ function ActionBar({ getSelectedText, selectedCount, large, isTop, copyFormat, s
           value={copyFormat || 'plain'}
           onChange={(e) => setCopyFormat(e.target.value)}
           title="複製格式"
-          style={{ background: '#ffffff', border: '1px solid #a5d6a7', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: '#1b5e20', fontWeight: 700, cursor: 'pointer' }}
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 700, cursor: 'pointer' }}
         >
           {COPY_FORMAT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
@@ -408,14 +408,14 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
   };
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', borderTop: '1px solid #a5d6a7', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+    <div style={{ background: 'var(--table-header-bg)', borderTop: '1px solid var(--border-strong)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center', width: '100%', maxWidth: '100%' }}>
         <button type="button" disabled={!hasPrevChap} onClick={() => go(`${bookName} ${chapNum - 1}`)} className="btn-active-effect" style={{ ...(hasPrevChap ? btnNav : btnNavDisabled), flexShrink: 0 }}>
           上一章
         </button>
-        <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px', flex: '1 1 auto', minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--heading-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px', flex: '1 1 auto', minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {bookName} {chapNum} 章 {isSingleVerse ? `${secNum}節` : ''}
-          {data.timeMs && <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 6, fontWeight: 500 }}>({data.timeMs}ms)</span>}
+          {data.timeMs && <span style={{ color: 'var(--muted-text)', fontSize: 11, marginLeft: 6, fontWeight: 500 }}>({data.timeMs}ms)</span>}
         </span>
         <button type="button" disabled={!hasNextChap} onClick={() => go(`${bookName} ${chapNum + 1}`)} className="btn-active-effect" style={{ ...(hasNextChap ? btnNav : btnNavDisabled), flexShrink: 0 }}>
           下一章
@@ -426,17 +426,17 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
           <button type="button" disabled={!hasPrevVerse} onClick={() => go(`${bookName} ${chapNum}:${secNum - 1}`)} style={{ ...(hasPrevVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)' } : btnNavDisabled), flexShrink: 0 }}>
             上一節
           </button>
-          <span style={{ fontSize: 13, color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1 1 auto', minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap' }}>第 {secNum} / {totalVerses} 節</span>
+          <span style={{ fontSize: 13, color: 'var(--soft-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1 1 auto', minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap' }}>第 {secNum} / {totalVerses} 節</span>
           <button type="button" disabled={!hasNextVerse} onClick={() => go(`${bookName} ${chapNum}:${secNum + 1}`)} style={{ ...(hasNextVerse ? { ...btnNav, background: 'linear-gradient(145deg, #1e88e5, #0d47a1)' } : btnNavDisabled), flexShrink: 0 }}>
             下一節
           </button>
         </div>
       )}
       <div style={{ width: '100%', maxWidth: 600, padding: '0 4px' }} title={`${bookName} 共 ${totalChaps} 章`}>
-        <div style={{ height: 4, background: '#c8e6c9', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+        <div style={{ height: 4, background: 'var(--progress-track)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
           <div style={{ height: '100%', width: `${Math.max(2, (chapNum / totalChaps) * 100)}%`, background: 'linear-gradient(90deg, #43a047, #1b5e20)', transition: 'width 0.2s' }} />
         </div>
-        <div style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', marginTop: 2 }}>
+        <div style={{ fontSize: 10, color: 'var(--muted-text)', textAlign: 'center', marginTop: 2 }}>
           {bookName} {chapNum} / {totalChaps} 章{isSingleVerse ? ` · 第 ${secNum} / ${totalVerses} 節` : ''}
         </div>
       </div>
@@ -526,8 +526,8 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
   return (
     <div style={{ ...S.card, padding: '72px 24px 24px', marginTop: -56, marginBottom: 0, borderRadius: 0, position: 'relative', zIndex: 5 }}>
       <div style={{ maxWidth: 980, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1b5e20', textAlign: 'center', marginBottom: 18, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-        多譯本聖經查詢 <small style={{ fontSize: 13, color: '#66bb6a', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.5</small>
+      <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--heading-text)', textAlign: 'center', marginBottom: 18, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+        多譯本聖經查詢 <small style={{ fontSize: 13, color: 'var(--subtle-text)', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.5</small>
       </h1>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 18 }}>
@@ -545,9 +545,9 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
           }}
           placeholder="關鍵字或書卷章節，例如：愛心、創 1、John 3:16 (按 / 聚焦, 按 ? 快速鍵說明)"
           id="bible-search-input"
-          style={{ ...S.input, width: '100%', padding: '14px 18px', fontSize: 16, outline: 'none', color: '#333' }}
-          onFocus={(e) => { e.target.style.borderColor = '#43a047'; }}
-          onBlur={(e) => { e.target.style.borderColor = '#a5d6a7'; }}
+          style={{ ...S.input, width: '100%', padding: '14px 18px', fontSize: 16, outline: 'none' }}
+          onFocus={(e) => { e.target.style.borderColor = 'var(--subtle-text)'; }}
+          onBlur={(e) => { e.target.style.borderColor = 'var(--border-strong)'; }}
         />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -600,20 +600,20 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
           return (
             <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 0 }}>
               {isActive && !isFirst && (
-                <button type="button" onClick={() => moveVersion(v.id, -1)} title="往左移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 4px', fontSize: 12, color: '#1b5e20', fontWeight: 800 }}>◀</button>
+                <button type="button" onClick={() => moveVersion(v.id, -1)} title="往左移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 4px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 800 }}>◀</button>
               )}
               <label style={isActive ? { ...S.pillActive, padding: '6px 16px', fontSize: 13 } : { ...S.pillInactive, padding: '6px 16px', fontSize: 13 }}>
                 <input type="checkbox" style={{ display: 'none' }} checked={isActive} onChange={() => handleVersionToggle(v.id)} />
                 {v.label}
               </label>
               {isActive && !isLast && (
-                <button type="button" onClick={() => moveVersion(v.id, 1)} title="往右移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 4px', fontSize: 12, color: '#1b5e20', fontWeight: 800 }}>▶</button>
+                <button type="button" onClick={() => moveVersion(v.id, 1)} title="往右移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 4px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 800 }}>▶</button>
               )}
             </span>
           );
         })}
       </div>
-      <div style={{ textAlign: 'center', fontSize: 11, color: '#6b7280', marginBottom: 12 }}>
+      <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted-text)', marginBottom: 12 }}>
         點選譯本切換顯示, 用 ◀▶ 調整顯示順序
       </div>
 
@@ -622,7 +622,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
           {showAdvanced ? '收合進階搜尋' : '進階搜尋'}
         </button>
         {typeof diffEnabled === 'boolean' && (
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', fontWeight: 700, cursor: 'pointer' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--page-text)', fontWeight: 700, cursor: 'pointer' }}>
             <input type="checkbox" checked={diffEnabled} onChange={(e) => setDiffEnabled(e.target.checked)} />
             差異高亮
           </label>
@@ -644,7 +644,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
             return <option key={vid} value={vid}>{tag ? `[${tag}] ` : ''}{vi?.label || vid}</option>;
           };
           return (
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#374151', fontWeight: 700, flexWrap: 'wrap' }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--page-text)', fontWeight: 700, flexWrap: 'wrap' }}>
               比較基準
               <select value={diffBase || ''} onChange={(e) => setDiffBase(e.target.value)} style={{ ...S.select, padding: '4px 8px', fontSize: 12, minWidth: 140, flex: 'none' }}>
                 <option value="">自動 (第一個有內容)</option>
@@ -660,12 +660,12 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
                 )}
               </select>
               {skippedCount > 0 && (
-                <span title="跨語系譯本不會做 token 差異比較" style={{ fontSize: 11, color: '#b45309', fontWeight: 600, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 5, padding: '1px 6px' }}>
+                <span title="跨語系譯本不會做 token 差異比較" style={{ fontSize: 11, color: 'var(--warning-text)', fontWeight: 600, background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 5, padding: '1px 6px' }}>
                   ⚠ 跨語系 {skippedCount} 個略過
                 </span>
               )}
               {showMixedHint && (
-                <span title="自動模式下跨語系譯本互比無意義, 建議指定基準" style={{ fontSize: 11, color: '#6b7280', fontWeight: 500 }}>
+                <span title="自動模式下跨語系譯本互比無意義, 建議指定基準" style={{ fontSize: 11, color: 'var(--muted-text)', fontWeight: 500 }}>
                   · 中英混選, 建議指定基準
                 </span>
               )}
@@ -675,8 +675,8 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
       </div>
 
       {showAdvanced && (
-        <div style={{ borderTop: '1px solid #c8e6c9', paddingTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+        <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: 'var(--subtle-text)', fontWeight: 700 }}>
             搜尋範圍
             <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ ...S.select, width: '100%' }}>
               <option value="all">整本聖經</option>
@@ -687,13 +687,13 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
           </label>
           {scope === 'range' && (
             <>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: 'var(--subtle-text)', fontWeight: 700 }}>
                 起始書卷
                 <select value={startBookIndex} onChange={(e) => setStartBookIndex(Number(e.target.value))} style={{ ...S.select, width: '100%' }}>
                   {bookMap.map((b, index) => <option key={b.localAbbrev} value={index}>{b.names[1]}</option>)}
                 </select>
               </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: 'var(--subtle-text)', fontWeight: 700 }}>
                 結束書卷
                 <select value={endBookIndex} onChange={(e) => setEndBookIndex(Number(e.target.value))} style={{ ...S.select, width: '100%' }}>
                   {bookMap.map((b, index) => <option key={b.localAbbrev} value={index}>{b.names[1]}</option>)}
@@ -701,22 +701,22 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
               </label>
             </>
           )}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: 'var(--subtle-text)', fontWeight: 700 }}>
             多字條件
             <select value={operator} onChange={(e) => setOperator(e.target.value)} style={{ ...S.select, width: '100%' }}>
               <option value="and">AND：全部都要包含</option>
               <option value="or">OR：任一字即可</option>
             </select>
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#2e7d32', fontWeight: 700 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: 'var(--subtle-text)', fontWeight: 700 }}>
             排除字詞
             <input value={exclude} onChange={(e) => setExclude(e.target.value)} placeholder="例如：仇敵, 戰爭" style={{ ...S.input, padding: '10px 12px' }} />
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', fontWeight: 700 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--page-text)', fontWeight: 700 }}>
             <input type="checkbox" checked={exactPhrase} onChange={(e) => setExactPhrase(e.target.checked)} />
             精確片語
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', fontWeight: 700 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--page-text)', fontWeight: 700 }}>
             <input type="checkbox" checked={searchSelectedVersions} onChange={(e) => setSearchSelectedVersions(e.target.checked)} />
             只搜尋已選譯本
           </label>
@@ -738,7 +738,7 @@ function AnnotationEditor({ reference, annotation, onChange }) {
   return (
     <div style={{ marginTop: 8, width: '100%' }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" onClick={() => update({ favorite: !current.favorite })} style={{ ...S.smallBtn, background: current.favorite ? '#fff7ed' : '#fff', borderColor: current.favorite ? '#fdba74' : '#a5d6a7', color: current.favorite ? '#c2410c' : '#1b5e20' }}>
+        <button type="button" onClick={() => update({ favorite: !current.favorite })} style={{ ...S.smallBtn, background: current.favorite ? 'var(--warning-bg)' : 'var(--input-bg)', borderColor: current.favorite ? 'var(--warning-border)' : 'var(--border-strong)', color: current.favorite ? 'var(--warning-text)' : 'var(--heading-text)' }}>
           {current.favorite ? '已收藏' : '收藏'}
         </button>
         <button type="button" onClick={() => setOpen((v) => !v)} style={S.smallBtn}>
@@ -770,10 +770,10 @@ function AnnotationEditor({ reference, annotation, onChange }) {
 }
 
 const btnFontSize = {
-  background: '#ffffff',
-  border: '2px solid #a5d6a7',
+  background: 'var(--input-bg)',
+  border: '2px solid var(--border-strong)',
   borderRadius: 9,
-  color: '#1b5e20',
+  color: 'var(--heading-text)',
   fontWeight: 700,
   cursor: 'pointer',
   padding: '6px 12px',
@@ -787,9 +787,9 @@ const btnFontSize = {
 function FontSizeControl({ fontSize, setFontSize, fixed }) {
   const content = (
     <>
-      <span style={{ fontSize: 13, color: '#555', fontWeight: 700 }}>字型大小</span>
+      <span style={{ fontSize: 13, color: 'var(--soft-text)', fontWeight: 700 }}>字型大小</span>
       <button type="button" onClick={() => setFontSize((s) => Math.max(10, s - 1))} style={btnFontSize} title="縮小">A-</button>
-      <span style={{ fontSize: 14, fontWeight: 800, color: '#1b5e20', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
+      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--heading-text)', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
       <button type="button" onClick={() => setFontSize((s) => Math.min(40, s + 1))} style={btnFontSize} title="放大">A+</button>
       <button type="button" onClick={() => setFontSize(15)} style={{ ...btnFontSize, fontSize: 12, padding: '6px 10px' }} title="重置">重置</button>
     </>
@@ -797,7 +797,7 @@ function FontSizeControl({ fontSize, setFontSize, fixed }) {
 
   if (fixed) {
     return (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', background: 'linear-gradient(135deg, #e8f5e9 0%, #f7fbef 50%, #e0f2e1 100%)', padding: '8px 16px', borderBottom: '2px solid #a5d6a7', boxShadow: '0 2px 12px rgba(76,175,80,0.2)' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', background: 'var(--topbar-bg)', padding: '8px 16px', borderBottom: '2px solid var(--border-strong)', boxShadow: 'var(--topbar-shadow)' }}>
         {content}
       </div>
     );
@@ -807,7 +807,7 @@ function FontSizeControl({ fontSize, setFontSize, fixed }) {
 }
 
 function EmptyState({ text }) {
-  return <div style={{ textAlign: 'center', color: '#777', padding: '48px 0', ...S.resultCard }}>{text}</div>;
+  return <div style={{ textAlign: 'center', color: 'var(--muted-text)', padding: '48px 0', ...S.resultCard }}>{text}</div>;
 }
 
 function getRecordForVerse(result, chap, sec, chineses) {
@@ -898,7 +898,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
         </div>
         {results.map((res) => {
           const vi = VERSIONS.find((v) => v.id === res.version);
-          return <div key={res.version} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || '#333', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
+          return <div key={res.version} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || 'var(--page-text)', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
         })}
       </div>
       <div>
@@ -906,14 +906,14 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
           const reference = makeReference(data.abbrev, Number(data.chap), vNum);
           const annotation = annotations[getVerseKey(reference)];
           const baseText = getBaseTextForVerse(results, null, vNum, null, diffBase);
-          const rowBackground = selected.has(vNum) ? '#e8f5e930' : softColor(annotation?.color);
+          const rowBackground = selected.has(vNum) ? 'var(--selected-row-bg)' : softColor(annotation?.color);
           return (
-            <div key={vNum} style={{ borderBottom: '1px solid #e8f5e9', background: rowBackground, transition: 'background 0.15s' }}>
+            <div key={vNum} style={{ borderBottom: '1px solid var(--row-border)', background: rowBackground, transition: 'background 0.15s' }}>
               <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
                 <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2, flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <input type="checkbox" checked={selected.has(vNum)} onChange={() => toggleVerse(vNum)} style={S.checkbox} />
-                    <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="mobile-verse-label" style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
+                    <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="mobile-verse-label" style={{ color: 'var(--link-text)', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
                       第 {vNum} 節
                     </a>
                     <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
@@ -931,11 +931,11 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                   const vd = res.record?.find((r) => r.sec === vNum);
                   const text = vd?.bible_text || '--';
                   const vi = VERSIONS.find((v) => v.id === res.version);
-                  const col = VERSION_COLORS[res.version] || '#333';
+                  const col = VERSION_COLORS[res.version] || 'var(--page-text)';
                   return (
                     <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || 15 }}>
                       <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
-                      <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="desktop-verse-num" style={{ color: '#1565c0', fontSize: 13, fontWeight: 700, marginRight: 6, verticalAlign: 'top', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
+                      <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="desktop-verse-num" style={{ color: 'var(--link-text)', fontSize: 13, fontWeight: 700, marginRight: 6, verticalAlign: 'top', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
                         {vNum}
                       </a>
                       <VerseText text={text} compareText={diffEnabled ? baseText : ''} />
@@ -1059,8 +1059,8 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
   return (
     <div style={S.resultCard}>
       <div style={{ ...S.statsBar, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: '12px 16px' }}>
-        <span style={{ color: '#b45309', fontSize: 14, fontWeight: 700 }}>關鍵字：<strong>「{keyword}」</strong></span>
-        <span style={{ color: '#92400e', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆命中（{verses.length} 節）<span style={{ color: '#6b7280', fontSize: 12, marginLeft: 6, fontWeight: 500 }}>{data.timeMs ? `${data.timeMs}ms` : ''}</span></span>
+        <span style={{ color: 'var(--warning-text)', fontSize: 14, fontWeight: 700 }}>關鍵字：<strong>「{keyword}」</strong></span>
+        <span style={{ color: 'var(--warning-strong-text)', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆命中（{verses.length} 節）<span style={{ color: 'var(--muted-text)', fontSize: 12, marginLeft: 6, fontWeight: 500 }}>{data.timeMs ? `${data.timeMs}ms` : ''}</span></span>
         <button type="button" onClick={handleTopCopy} className="btn-active-effect" style={{ ...(topCopied ? S.btnCopied : S.btnCopy), padding: '13px 24px', fontSize: 17, minWidth: 210, flexGrow: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           {topCopied ? '已複製全部' : '複製全部經文'}
         </button>
@@ -1068,7 +1068,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
           {results.map((r) => {
             const vi = VERSIONS.find((v) => v.id === r.version);
             const count = Number.isInteger(r.matchedCount) ? r.matchedCount : (r.record?.length ?? 0);
-            return <span key={r.version} style={{ fontSize: 11, border: '1px solid #fde68a', color: VERSION_COLORS[r.version] || '#92400e', borderRadius: 999, padding: '2px 8px', fontWeight: 700, background: '#fffde7' }}>{vi?.label}: {count}</span>;
+            return <span key={r.version} style={{ fontSize: 11, border: '1px solid var(--warning-border)', color: VERSION_COLORS[r.version] || 'var(--warning-strong-text)', borderRadius: 999, padding: '2px 8px', fontWeight: 700, background: 'var(--warning-bg)' }}>{vi?.label}: {count}</span>;
           })}
         </div>
       </div>
@@ -1079,7 +1079,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
         </div>
         {results.map((res) => {
           const vi = VERSIONS.find((v) => v.id === res.version);
-          return <div key={res.version} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || '#333', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
+          return <div key={res.version} style={{ fontWeight: 800, color: VERSION_COLORS[res.version] || 'var(--page-text)', textAlign: 'center', fontSize: 14 }}>{vi?.label}</div>;
         })}
       </div>
       <div>
@@ -1087,14 +1087,14 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
           const reference = makeReference(vo.localAbbrev, vo.chap, vo.sec);
           const annotation = annotations[getVerseKey(reference)];
           const baseText = getBaseTextForVerse(results, vo.chap, vo.sec, vo.chineses, diffBase);
-          const rowBackground = selected.has(vo.key) ? '#fef9c340' : softColor(annotation?.color);
+          const rowBackground = selected.has(vo.key) ? 'var(--keyword-selected-row-bg)' : softColor(annotation?.color);
           return (
-            <div key={vo.key} style={{ borderBottom: '1px solid #e8f5e9', background: rowBackground, transition: 'background 0.15s' }}>
+            <div key={vo.key} style={{ borderBottom: '1px solid var(--row-border)', background: rowBackground, transition: 'background 0.15s' }}>
               <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
                 <div className="responsive-checkbox-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 2, flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <input type="checkbox" checked={selected.has(vo.key)} onChange={() => toggleVerse(vo.key)} style={S.checkbox} />
-                    <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="mobile-verse-label" style={{ color: '#1565c0', textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
+                    <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="mobile-verse-label" style={{ color: 'var(--link-text)', textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
                       {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
                     </a>
                     <FhlLink abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} />
@@ -1111,11 +1111,11 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
                 {results.map((res) => {
                   const vd = res.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
                   const vi = VERSIONS.find((v) => v.id === res.version);
-                  const col = VERSION_COLORS[res.version] || '#333';
+                  const col = VERSION_COLORS[res.version] || 'var(--page-text)';
                   return (
                     <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || 15 }}>
                       <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
-                      <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="desktop-verse-num" style={{ color: '#1565c0', fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.9, textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
+                      <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="desktop-verse-num" style={{ color: 'var(--link-text)', fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.9, textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
                         {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
                       </a>
                       {vd ? <VerseText text={vd.bible_text} keyword={keyword} exactPhrase={Boolean(data.searchOptions?.exactPhrase)} compareText={diffEnabled ? baseText : ''} /> : <span style={{ color: '#aaa' }}>--</span>}
@@ -1128,7 +1128,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
         })}
       </div>
       {hasMore && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 16px', background: '#f7fbef', borderTop: '1px solid #c8e6c9' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 16px', background: 'var(--action-bar-bg)', borderTop: '1px solid var(--border-soft)' }}>
           <button
             type="button"
             onClick={() => setDisplayLimit((n) => n + PAGE_SIZE)}
@@ -1171,7 +1171,7 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
   return (
     <div style={{ ...S.card, maxWidth: 1180, margin: '0 auto 22px', padding: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-        <h2 style={{ margin: 0, color: '#1b5e20', fontSize: 18 }}>我的查詢與筆記</h2>
+        <h2 style={{ margin: 0, color: 'var(--heading-text)', fontSize: 18 }}>我的查詢與筆記</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={onExport} style={S.smallBtn}>匯出 JSON</button>
           <button type="button" onClick={() => fileInputRef.current?.click()} style={S.smallBtn}>匯入 JSON</button>
@@ -1179,18 +1179,18 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(0, 1fr))', gap: 14 }}>
-        <section style={{ background: '#ffffffcc', border: '1px solid #d9ead3', borderRadius: 10, padding: 12, minWidth: 0, overflow: 'hidden' }}>
+        <section style={{ background: 'var(--panel-bg)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: 12, minWidth: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ margin: 0, color: '#2e7d32', fontSize: 15 }}>查詢歷史</h3>
+            <h3 style={{ margin: 0, color: 'var(--subtle-text)', fontSize: 15 }}>查詢歷史</h3>
             {history.length > 0 && <button type="button" onClick={onClearHistory} style={S.dangerBtn}>清空</button>}
           </div>
-          {history.length === 0 && <p style={{ margin: 0, color: '#6b7280', fontSize: 13 }}>查詢後會自動保留最近紀錄。</p>}
+          {history.length === 0 && <p style={{ margin: 0, color: 'var(--muted-text)', fontSize: 13 }}>查詢後會自動保留最近紀錄。</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
             {history.slice(0, 12).map((item) => (
-              <div key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: '#fff', minWidth: 0, overflow: 'hidden' }}>
+              <div key={item.id} style={{ border: '1px solid var(--border-muted)', borderRadius: 8, padding: 8, background: 'var(--surface-solid)', minWidth: 0, overflow: 'hidden' }}>
                 <button type="button" onClick={() => onRunHistory(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-                  <strong style={{ color: '#111827', fontSize: 14 }}>{item.query}</strong>
-                  <div style={{ color: '#6b7280', fontSize: 12, marginTop: 3 }}>
+                  <strong style={{ color: 'var(--page-text)', fontSize: 14 }}>{item.query}</strong>
+                  <div style={{ color: 'var(--muted-text)', fontSize: 12, marginTop: 3 }}>
                     {formatDateTime(item.ts)} · {item.resultCount} 筆
                   </div>
                 </button>
@@ -1199,16 +1199,16 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
             ))}
           </div>
         </section>
-        <section style={{ background: '#ffffffcc', border: '1px solid #d9ead3', borderRadius: 10, padding: 12, minWidth: 0, overflow: 'hidden' }}>
-          <h3 style={{ margin: '0 0 8px', color: '#2e7d32', fontSize: 15 }}>收藏 / 筆記 / 螢光筆</h3>
-          {annotationItems.length === 0 && <p style={{ margin: 0, color: '#6b7280', fontSize: 13 }}>在經文旁可收藏、標色與寫筆記。</p>}
+        <section style={{ background: 'var(--panel-bg)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: 12, minWidth: 0, overflow: 'hidden' }}>
+          <h3 style={{ margin: '0 0 8px', color: 'var(--subtle-text)', fontSize: 15 }}>收藏 / 筆記 / 螢光筆</h3>
+          {annotationItems.length === 0 && <p style={{ margin: 0, color: 'var(--muted-text)', fontSize: 13 }}>在經文旁可收藏、標色與寫筆記。</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
             {annotationItems.slice(0, 30).map((item) => (
-              <div key={item.key} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: item.color || '#fff', minWidth: 0, overflow: 'hidden' }}>
+              <div key={item.key} style={{ border: '1px solid var(--border-muted)', borderRadius: 8, padding: 8, background: item.color || 'var(--surface-solid)', minWidth: 0, overflow: 'hidden' }}>
                 <button type="button" onClick={() => onRunAnnotation(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-                  <strong style={{ color: '#111827', fontSize: 14 }}>{item.label}</strong>
-                  <div style={{ color: '#4b5563', fontSize: 12, marginTop: 3 }}>{item.favorite ? '已收藏' : '已標記'} · {formatDateTime(item.updatedAt)}</div>
-                  {item.note && <p style={{ margin: '6px 0 0', color: '#374151', fontSize: 13, lineHeight: 1.45, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{item.note}</p>}
+                  <strong style={{ color: 'var(--page-text)', fontSize: 14 }}>{item.label}</strong>
+                  <div style={{ color: 'var(--soft-text)', fontSize: 12, marginTop: 3 }}>{item.favorite ? '已收藏' : '已標記'} · {formatDateTime(item.updatedAt)}</div>
+                  {item.note && <p style={{ margin: '6px 0 0', color: 'var(--page-text)', fontSize: 13, lineHeight: 1.45, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{item.note}</p>}
                 </button>
                 <button type="button" onClick={() => onDeleteAnnotation(item)} style={{ ...S.dangerBtn, marginTop: 6 }}>刪除</button>
               </div>
@@ -1254,7 +1254,7 @@ function InstallButton() {
     window.deferredInstallPrompt = null;
   };
 
-  if (installed) return <span style={{ fontSize: 12, color: '#2e7d32', padding: '6px 14px', borderRadius: 999, border: '1px solid #a5d6a7', background: '#e8f5e9', fontWeight: 700 }}>已安裝</span>;
+  if (installed) return <span style={{ fontSize: 12, color: 'var(--subtle-text)', padding: '6px 14px', borderRadius: 999, border: '1px solid var(--border-strong)', background: 'var(--surface-bg)', fontWeight: 700 }}>已安裝</span>;
   return <button type="button" onClick={handleInstall} style={{ ...S.btnInstall, padding: '10px 22px', fontSize: 14 }}>安裝 App</button>;
 }
 
@@ -1523,7 +1523,7 @@ export default function App() {
             type="button"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             title="切換深色/淺色"
-            style={{ background: theme === 'dark' ? '#1e293b' : '#ffffff', color: theme === 'dark' ? '#f1f5f9' : '#1b5e20', border: '2px solid #a5d6a7', borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            style={{ background: 'var(--input-bg)', color: 'var(--heading-text)', border: '2px solid var(--border-strong)', borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
           >
             {theme === 'dark' ? '☀ 淺色' : '🌙 深色'}
           </button>
@@ -1539,8 +1539,8 @@ export default function App() {
           onExport={exportData}
           onImport={importData}
         />
-        {error && <div style={{ background: '#ffebee', border: '1px solid #ef9a9a', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: '#c62828' }}>警告：{error}</div>}
-        {loading && <div style={{ textAlign: 'center', color: '#2e7d32', padding: '64px 0', fontSize: 18, fontWeight: 700 }}>搜尋中，請稍候...</div>}
+        {error && <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: 'var(--danger-text)' }}>警告：{error}</div>}
+        {loading && <div style={{ textAlign: 'center', color: 'var(--subtle-text)', padding: '64px 0', fontSize: 18, fontWeight: 700 }}>搜尋中，請稍候...</div>}
         {!loading && data && data.mode === 'verse' && (
           <VerseViewer
             data={data}
@@ -1570,7 +1570,7 @@ export default function App() {
             setCopyFormat={setCopyFormat}
           />
         )}
-        <footer style={{ marginTop: 48, textAlign: 'center', color: '#66a96a', fontSize: 12, paddingBottom: 32 }}>
+        <footer style={{ marginTop: 48, textAlign: 'center', color: 'var(--muted-text)', fontSize: 12, paddingBottom: 32 }}>
           資料來源：信望愛 (FHL) 聖經、本機 JSON、8 種譯本離線可用
         </footer>
       </div>
