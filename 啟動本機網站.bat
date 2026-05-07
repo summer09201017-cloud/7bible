@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-setlocal
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 title 多譯本聖經查詢 - 本機伺服器
 
@@ -33,7 +33,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/3] 取得區網 IP，啟動 preview 伺服器 (port 4173)...
+echo [3/3] 列出可連線網址，啟動 preview 伺服器 (port 4173)...
 echo.
 echo ------------------------------------------------------------
 echo  電腦本機請打開：    http://localhost:4173
@@ -43,13 +43,21 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
 )
 echo ------------------------------------------------------------
 echo.
-echo 提示：手機若仍看到舊版，請「清除瀏覽器資料」或在開啟頁面後
-echo       下拉重新整理兩次 (新版 Service Worker 會自動接管)。
+echo 提示：
+echo   - 手機請打開上方「http://192.x.x.x:4173」這類網址，
+echo     不要點 PWA 圖示或 Netlify 線上版本，否則仍是舊版。
+echo   - 頁面最底會顯示 build 時間，可比對手機 / 電腦是否一致。
 echo.
 
-start "" http://localhost:4173
+rem 背景啟動：等待 port 4173 開啟後自動打開瀏覽器
+start "" /B powershell -NoProfile -WindowStyle Hidden -Command ^
+  "$tries = 0; while ($tries -lt 60) { try { $c = New-Object System.Net.Sockets.TcpClient; $r = $c.BeginConnect('127.0.0.1', 4173, $null, $null); $ok = $r.AsyncWaitHandle.WaitOne(500); if ($ok -and $c.Connected) { $c.Close(); Start-Process 'http://localhost:4173'; break }; $c.Close() } catch {}; Start-Sleep -Milliseconds 500; $tries++ }"
 
-call npx vite preview --host 0.0.0.0 --port 4173
+echo 啟動 vite preview... (伺服器就緒後會自動開啟瀏覽器)
+echo 關閉本視窗或按 Ctrl+C 即可停止伺服器。
+echo.
+
+call npx vite preview --host 0.0.0.0 --port 4173 --strictPort
 
 echo.
 echo 伺服器已關閉。

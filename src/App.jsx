@@ -2293,6 +2293,9 @@ export default function App() {
         )}
         <footer style={{ marginTop: 48, textAlign: 'center', color: 'var(--muted-text)', fontSize: 12, paddingBottom: 32 }}>
           資料來源：信望愛 (FHL) 聖經、本機 JSON、8 種譯本離線可用
+          <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7 }}>
+            build {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}
+          </div>
         </footer>
       </div>
     </div>
