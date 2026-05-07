@@ -1,6 +1,5 @@
-const CACHE_NAME = 'bible-app-v9';
+const CACHE_NAME = 'bible-app-v10';
 
-// App shell only - 經文資料改為懶快取 (首次使用時才存)
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -14,12 +13,17 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
+    await self.clients.claim();
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED', cache: CACHE_NAME }));
+  })());
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {

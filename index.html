@@ -18,8 +18,32 @@
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
+        let didReload = false;
+        const reloadOnce = () => {
+          if (didReload) return;
+          didReload = true;
+          window.location.reload();
+        };
+        navigator.serviceWorker.addEventListener('controllerchange', reloadOnce);
+        navigator.serviceWorker.addEventListener('message', (e) => {
+          if (e.data?.type === 'SW_UPDATED') reloadOnce();
+        });
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js');
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            reg.update();
+            const handleNew = (worker) => {
+              if (!worker) return;
+              worker.addEventListener('statechange', () => {
+                if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                  worker.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            };
+            handleNew(reg.installing);
+            handleNew(reg.waiting);
+            reg.addEventListener('updatefound', () => handleNew(reg.installing));
+            setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+          });
         });
       }
     </script>
