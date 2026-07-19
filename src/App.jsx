@@ -1691,9 +1691,8 @@ function footprintLevel(count) {
   return 4;
 }
 
-function FootprintCard({ readingLog, onToggle, onClear, bibleStructure, onNavigate }) {
+function FootprintCard({ readingLog, bibleStructure, onNavigate }) {
   const [rangeId, setRangeId] = useState('3m');
-  const enabled = readingLog?.enabled !== false;
   const rangeDef = FOOTPRINT_RANGES.find((r) => r.id === rangeId) || FOOTPRINT_RANGES[1];
 
   const aggregate = useMemo(() => {
@@ -1765,27 +1764,10 @@ function FootprintCard({ readingLog, onToggle, onClear, bibleStructure, onNaviga
     <div style={{ ...S.card, maxWidth: 1180, margin: '0 auto 22px', padding: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <h2 style={{ margin: 0, color: 'var(--heading-text)', fontSize: 18 }}>讀經足跡</h2>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button type="button" onClick={onToggle} style={S.smallBtn}>{enabled ? '停用記錄' : '重新啟用'}</button>
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('確定要清除全部讀經足跡嗎？此動作無法復原。')) onClear();
-            }}
-            style={S.dangerBtn}
-          >
-            清除全部
-          </button>
-        </div>
       </div>
       <div style={{ color: 'var(--muted-text)', fontSize: 12, marginBottom: 12 }}>
         閱讀整章並停留 15 秒才會自動記錄；單節查詢、關鍵字搜尋與開啟 App 自動還原不計。記錄只存在這台裝置。
       </div>
-      {!enabled && (
-        <div style={{ background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 10, padding: 14, color: 'var(--warning-text)', fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-          足跡記錄已停用，既有記錄仍保留。按「重新啟用」可繼續記錄。
-        </div>
-      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 14 }}>
         <div style={statBox}><div style={statNum}>{todayCount}</div><div style={statLabel}>今日章次</div></div>
         <div style={statBox}><div style={statNum}>{streak}</div><div style={statLabel}>連續天數</div></div>
@@ -2157,17 +2139,6 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [data, commitReadingLog]);
 
-  const toggleReadingLog = useCallback(() => {
-    setReadingLog((prev) => {
-      const log = prev && typeof prev === 'object' ? prev : {};
-      return { ...log, enabled: log.enabled === false };
-    });
-  }, [setReadingLog]);
-
-  const clearReadingLog = useCallback(() => {
-    setReadingLog((prev) => ({ enabled: (prev && typeof prev === 'object' ? prev.enabled : true) !== false, m: {}, d: {}, recent: {} }));
-  }, [setReadingLog]);
-
   useEffect(() => {
     if (!data) return;
     const params = new URLSearchParams();
@@ -2359,8 +2330,6 @@ export default function App() {
           <>
             <FootprintCard
               readingLog={readingLog}
-              onToggle={toggleReadingLog}
-              onClear={clearReadingLog}
               bibleStructure={bibleStructure}
               onNavigate={(q) => handleSearch(q, versions, {})}
             />
