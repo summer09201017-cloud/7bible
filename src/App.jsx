@@ -1878,28 +1878,26 @@ function UserLibrary({ history, onRunHistory, onClearHistory, onDeleteHistory, o
           <input ref={fileInputRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={handleFile} />
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(0, 1fr))', gap: 14 }}>
-        <section style={{ background: 'var(--panel-bg)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: 12, minWidth: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ margin: 0, color: 'var(--subtle-text)', fontSize: 15 }}>查詢歷史</h3>
-            {history.length > 0 && <button type="button" onClick={onClearHistory} style={S.dangerBtn}>清空</button>}
-          </div>
-          {history.length === 0 && <p style={{ margin: 0, color: 'var(--muted-text)', fontSize: 13 }}>查詢後會自動保留最近紀錄。</p>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
-            {history.slice(0, 12).map((item) => (
-              <div key={item.id} style={{ border: '1px solid var(--border-muted)', borderRadius: 8, padding: 8, background: 'var(--surface-solid)', minWidth: 0, overflow: 'hidden' }}>
-                <button type="button" onClick={() => onRunHistory(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-                  <strong style={{ color: 'var(--page-text)', fontSize: 14 }}>{item.query}</strong>
-                  <div style={{ color: 'var(--muted-text)', fontSize: 12, marginTop: 3 }}>
-                    {formatDateTime(item.ts)} · {item.resultCount} 筆
-                  </div>
-                </button>
-                <button type="button" onClick={() => onDeleteHistory(item.id)} style={{ ...S.dangerBtn, marginTop: 6 }}>刪除</button>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+      <section style={{ background: 'var(--panel-bg)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <h3 style={{ margin: 0, color: 'var(--subtle-text)', fontSize: 15 }}>查詢歷史</h3>
+          {history.length > 0 && <button type="button" onClick={onClearHistory} style={S.dangerBtn}>清空</button>}
+        </div>
+        {history.length === 0 && <p style={{ margin: 0, color: 'var(--muted-text)', fontSize: 13 }}>查詢後會自動保留最近紀錄。</p>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 360, overflow: 'auto' }}>
+          {history.slice(0, 20).map((item) => (
+            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border-muted)', borderRadius: 8, padding: '8px 12px', background: 'var(--surface-solid)' }}>
+              <button type="button" onClick={() => onRunHistory(item)} style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                <strong style={{ color: 'var(--page-text)', fontSize: 14, display: 'block', overflowWrap: 'anywhere' }}>{item.query}</strong>
+                <div style={{ color: 'var(--muted-text)', fontSize: 12, marginTop: 3 }}>
+                  {formatDateTime(item.ts)} · {item.resultCount} 筆
+                </div>
+              </button>
+              <button type="button" onClick={() => onDeleteHistory(item.id)} style={{ ...S.dangerBtn, flexShrink: 0 }}>刪除</button>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -2359,12 +2357,6 @@ export default function App() {
         </div>
         {view === 'library' && (
           <>
-            <DailyTools
-              bibleStructure={bibleStructure}
-              readingProgress={readingProgress}
-              setReadingProgress={setReadingProgress}
-              onNavigate={(q) => handleSearch(q, versions, {})}
-            />
             <FootprintCard
               readingLog={readingLog}
               onToggle={toggleReadingLog}
@@ -2379,6 +2371,12 @@ export default function App() {
               onDeleteHistory={(id) => setHistory((prev) => prev.filter((item) => item.id !== id))}
               onExport={exportData}
               onImport={importData}
+            />
+            <DailyTools
+              bibleStructure={bibleStructure}
+              readingProgress={readingProgress}
+              setReadingProgress={setReadingProgress}
+              onNavigate={(q) => handleSearch(q, versions, {})}
             />
           </>
         )}
