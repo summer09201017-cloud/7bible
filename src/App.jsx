@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { fetchBible, VERSIONS } from './api';
+import { fetchBible, loadXref, VERSIONS } from './api';
 import { bookMap } from './bible_books';
 
 const VERSION_COLORS = {
@@ -13,18 +13,8 @@ const VERSION_COLORS = {
   kjv: 'var(--version-kjv)',
 };
 
-const HIGHLIGHT_COLORS = [
-  { id: '', label: '無', color: '#ffffff' },
-  { id: '#fff3a3', label: '黃', color: '#fff3a3' },
-  { id: '#d9f99d', label: '綠', color: '#d9f99d' },
-  { id: '#bfdbfe', label: '藍', color: '#bfdbfe' },
-  { id: '#fbcfe8', label: '粉', color: '#fbcfe8' },
-  { id: '#ddd6fe', label: '紫', color: '#ddd6fe' },
-];
-
 const LS_KEYS = {
   history: 'bible-tool-history-v1',
-  annotations: 'bible-tool-annotations-v1',
   versions: 'bible-tool-versions-v1',
   fontSize: 'bible-tool-font-size-v1',
   diffEnabled: 'bible-tool-diff-enabled-v1',
@@ -33,6 +23,7 @@ const LS_KEYS = {
   copyFormat: 'bible-tool-copy-format-v1',
   theme: 'bible-tool-theme-v1',
   readingProgress: 'bible-tool-reading-progress-v1',
+  readingLog: 'bible-tool-reading-log-v1',
 };
 
 const BOOK_GROUPS = [
@@ -266,21 +257,17 @@ function getBookName(localAbbrev, longName = false) {
   return entry ? entry.names[longName ? 1 : 0] : localAbbrev;
 }
 
-function getVerseKey(ref) {
-  return `${ref.abbrev}:${ref.chap}:${ref.sec}`;
+function ymKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function makeReference(abbrev, chap, sec) {
-  const bEntry = bookMap.find((b) => b.localAbbrev === abbrev);
-  const bookName = bEntry ? bEntry.names[0] : abbrev;
-  return {
-    abbrev,
-    chap: Number(chap),
-    sec: Number(sec),
-    label: `${bookName} ${chap}:${sec}`,
-    bookName,
-  };
+function ymdKey(date) {
+  return `${ymKey(date)}-${String(date.getDate()).padStart(2, '0')}`;
 }
+
+const FOOTPRINT_DWELL_MS = 15000;
+const FOOTPRINT_DEDUPE_MS = 30 * 60 * 1000;
+const FOOTPRINT_RECENT_TTL_MS = 60 * 60 * 1000;
 
 function formatDateTime(value) {
   const date = new Date(value);
@@ -309,47 +296,37 @@ const COPY_FORMAT_OPTIONS = [
   { id: 'html', label: 'HTML' },
 ];
 
-const DAILY_VERSE_REFS = [
-  'John 3:16',
-  'Psalm 23:1',
-  'Romans 8:28',
-  'Philippians 4:6',
-  'Isaiah 40:31',
-  'Proverbs 3:5',
-  'Matthew 11:28',
-  '2 Corinthians 5:17',
-  'Psalm 46:1',
-  'Jeremiah 29:11',
-  'Hebrews 11:1',
-  '1 Corinthians 13:4',
-  'Galatians 5:22',
-  'Joshua 1:9',
-  'Matthew 6:33',
-  'Psalm 119:105',
-  'John 14:27',
-  'Romans 12:2',
-  'Ephesians 2:8',
-  'James 1:5',
-  '1 Peter 5:7',
-  'Revelation 21:4',
-  'Psalm 121:1',
-  'Micah 6:8',
-  'Colossians 3:23',
-  '1 John 4:18',
-  'Matthew 5:16',
-  'Isaiah 41:10',
-  'Psalm 27:1',
-  'Romans 15:13',
-];
-
 const SEARCH_CHIPS = [
-  { label: '約 3:16', query: 'John 3:16' },
-  { label: '詩篇 23', query: 'Psalm 23' },
-  { label: '愛 信心', query: '愛 信心', options: { operator: 'and' } },
   { label: 'love OR grace', query: 'love grace', options: { operator: 'or' } },
-  { label: '完整片語', query: '神愛世人', options: { exactPhrase: true } },
   { label: '只查新約', query: '恩典', options: { scope: 'nt' } },
 ];
+
+function showToast(message) {
+  document.dispatchEvent(new CustomEvent('app-toast', { detail: message }));
+}
+
+function Toast() {
+  const [msg, setMsg] = useState(null);
+  const timerRef = useRef(null);
+  useEffect(() => {
+    const handler = (e) => {
+      setMsg(String(e.detail || ''));
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => setMsg(null), 2200);
+    };
+    document.addEventListener('app-toast', handler);
+    return () => {
+      document.removeEventListener('app-toast', handler);
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, []);
+  if (!msg) return null;
+  return (
+    <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', zIndex: 10000, background: 'var(--surface-solid)', color: 'var(--page-text)', border: '1px solid var(--border-strong)', borderRadius: 999, padding: '10px 22px', fontSize: 14, fontWeight: 700, boxShadow: 'var(--card-shadow)', maxWidth: '90vw', textAlign: 'center' }}>
+      {msg}
+    </div>
+  );
+}
 
 function shareToLine(text) {
   window.open(`https://social-plugins.line.me/lineit/share?url=&text=${encodeURIComponent(text)}`, '_blank');
@@ -363,7 +340,7 @@ function speakText(text) {
   const clean = stripTags(text).replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
   if (!clean) return;
   if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
-    window.alert('這個瀏覽器目前不支援朗讀功能');
+    showToast('這個瀏覽器目前不支援朗讀功能');
     return;
   }
   window.speechSynthesis.cancel();
@@ -465,11 +442,6 @@ function downloadVerseCardFromText(text, title = '經文卡片') {
     link.click();
     URL.revokeObjectURL(url);
   }, 'image/png');
-}
-
-function softColor(color) {
-  if (!color) return 'transparent';
-  return `linear-gradient(90deg, ${color} 0%, ${color}99 45%, transparent 100%)`;
 }
 
 function getTextKind(text) {
@@ -631,6 +603,80 @@ function SpeakButton({ getText, label = '朗讀' }) {
   );
 }
 
+function formatXrefEntry(entry) {
+  const [bi, chap, sec, end] = entry;
+  const book = bookMap[bi];
+  if (!book) return null;
+  const label = `${book.names[0]} ${chap}:${sec}${end ? `-${end}` : ''}`;
+  return { label, query: label };
+}
+
+function XrefButton({ open, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onToggle();
+      }}
+      title="展開串珠（相關經文）"
+      style={{
+        marginLeft: 6,
+        padding: '2px 8px',
+        fontSize: 11,
+        fontWeight: 700,
+        border: '1px solid var(--border-strong)',
+        background: open ? 'linear-gradient(145deg, #43a047, #2e7d32)' : 'var(--input-bg)',
+        color: open ? 'white' : 'var(--heading-text)',
+        borderRadius: 5,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      串珠
+    </button>
+  );
+}
+
+function XrefPanel({ abbrev, chap, sec, onNavigate }) {
+  const [refs, setRefs] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    setRefs(null);
+    loadXref(abbrev)
+      .then((data) => {
+        if (active) setRefs((data[`${chap}:${sec}`] || []).map(formatXrefEntry).filter(Boolean));
+      })
+      .catch(() => {
+        if (active) setRefs([]);
+      });
+    return () => { active = false; };
+  }, [abbrev, chap, sec]);
+
+  return (
+    <div style={{ padding: '8px 16px 14px', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', borderTop: '1px dashed var(--border-soft)' }}>
+      <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--subtle-text)', marginRight: 2 }}>串珠</span>
+      {refs === null && <span style={{ fontSize: 12, color: 'var(--muted-text)' }}>載入中...</span>}
+      {refs !== null && refs.length === 0 && <span style={{ fontSize: 12, color: 'var(--muted-text)' }}>此節暫無串珠資料</span>}
+      {refs !== null && refs.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onClick={() => {
+            onNavigate(item.query);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          style={{ ...S.smallBtn, borderRadius: 999, padding: '4px 10px' }}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function FhlLink({ abbrev, chap, sec }) {
   const url = getFhlCommentaryUrl(abbrev, chap, sec);
   if (!url) return null;
@@ -781,6 +827,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
   const [exactPhrase, setExactPhrase] = useState(false);
   const [exclude, setExclude] = useState('');
   const [searchSelectedVersions, setSearchSelectedVersions] = useState(false);
+  const [composing, setComposing] = useState(false);
 
   const searchOptions = useMemo(() => ({
     scope,
@@ -807,11 +854,12 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
   }, [selBook, selChap, selVerse, selEndVerse]);
 
   useEffect(() => {
+    if (composing) return undefined;
     const q = query.trim();
     if (q.length < 2) return undefined;
     const timeout = window.setTimeout(() => onSearch(q, versions, searchOptions), q.length === 2 ? 120 : 260);
     return () => window.clearTimeout(timeout);
-  }, [query, versions, searchOptions, onSearch]);
+  }, [query, versions, searchOptions, onSearch, composing]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -879,6 +927,8 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
               setSelEndVerse('');
             }
           }}
+          onCompositionStart={() => setComposing(true)}
+          onCompositionEnd={() => setComposing(false)}
           placeholder="關鍵字或書卷章節，例如：愛心、創 1、John 3:16 (按 / 聚焦, 按 ? 快速鍵說明)"
           id="bible-search-input"
           style={{ ...S.input, width: '100%', padding: '14px 18px', fontSize: 16, outline: 'none' }}
@@ -942,7 +992,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
         </button>
       </form>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6, maxWidth: 480, margin: '0 auto 6px' }}>
         {[
           ...versions.map((vid) => VERSIONS.find((v) => v.id === vid)).filter(Boolean),
           ...VERSIONS.filter((v) => v.id !== 'web' && !versions.includes(v.id)),
@@ -952,16 +1002,16 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
           const isFirst = idx === 0;
           const isLast = idx === versions.length - 1;
           return (
-            <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 0 }}>
+            <span key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 0, minWidth: 0 }}>
               {isActive && !isFirst && (
-                <button type="button" onClick={() => moveVersion(v.id, -1)} title="往左移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 4px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 800 }}>◀</button>
+                <button type="button" onClick={() => moveVersion(v.id, -1)} title="往左移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 2px', fontSize: 10, color: 'var(--heading-text)', fontWeight: 800, flexShrink: 0 }}>◀</button>
               )}
-              <label style={isActive ? { ...S.pillActive, padding: '6px 16px', fontSize: 13 } : { ...S.pillInactive, padding: '6px 16px', fontSize: 13 }}>
+              <label style={{ ...(isActive ? S.pillActive : S.pillInactive), padding: '4px 6px', fontSize: 12, flex: 1, minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 <input type="checkbox" style={{ display: 'none' }} checked={isActive} onChange={() => handleVersionToggle(v.id)} />
                 {v.label}
               </label>
               {isActive && !isLast && (
-                <button type="button" onClick={() => moveVersion(v.id, 1)} title="往右移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px 4px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 800 }}>▶</button>
+                <button type="button" onClick={() => moveVersion(v.id, 1)} title="往右移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 2px', fontSize: 10, color: 'var(--heading-text)', fontWeight: 800, flexShrink: 0 }}>▶</button>
               )}
             </span>
           );
@@ -1081,48 +1131,6 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
   );
 }
 
-function AnnotationEditor({ reference, annotation, onChange }) {
-  const [open, setOpen] = useState(false);
-  const current = annotation || {};
-  const hasData = Boolean(current.favorite || current.note || current.color);
-
-  const update = (patch) => onChange(reference, patch);
-  const clear = () => onChange(reference, { note: '', color: '', favorite: false, clear: true });
-
-  return (
-    <div style={{ marginTop: 8, width: '100%' }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" onClick={() => update({ favorite: !current.favorite })} style={{ ...S.smallBtn, background: current.favorite ? 'var(--warning-bg)' : 'var(--input-bg)', borderColor: current.favorite ? 'var(--warning-border)' : 'var(--border-strong)', color: current.favorite ? 'var(--warning-text)' : 'var(--heading-text)' }}>
-          {current.favorite ? '已收藏' : '收藏'}
-        </button>
-        <button type="button" onClick={() => setOpen((v) => !v)} style={S.smallBtn}>
-          {current.note ? '編輯筆記' : '筆記'}
-        </button>
-        {hasData && <button type="button" onClick={clear} style={S.dangerBtn}>清除</button>}
-      </div>
-      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 7 }}>
-        {HIGHLIGHT_COLORS.map((c) => (
-          <button
-            key={c.label}
-            type="button"
-            onClick={() => update({ color: c.id })}
-            title={`${c.label}螢光筆`}
-            style={{ width: 22, height: 22, borderRadius: 6, border: current.color === c.id ? '2px solid #166534' : '1px solid #94a3b8', background: c.color, cursor: 'pointer' }}
-          />
-        ))}
-      </div>
-      {open && (
-        <textarea
-          value={current.note || ''}
-          onChange={(e) => update({ note: e.target.value })}
-          placeholder="在這節旁寫筆記..."
-          style={{ ...S.textarea, marginTop: 8 }}
-        />
-      )}
-    </div>
-  );
-}
-
 const btnFontSize = {
   background: 'var(--input-bg)',
   border: '2px solid var(--border-strong)',
@@ -1164,97 +1172,6 @@ function EmptyState({ text }) {
   return <div style={{ textAlign: 'center', color: 'var(--muted-text)', padding: '48px 0', ...S.resultCard }}>{text}</div>;
 }
 
-const MEMORY_LEVELS = [
-  { value: 0, label: '原文' },
-  { value: 1, label: '遮 25%' },
-  { value: 2, label: '遮 50%' },
-  { value: 3, label: '遮 75%' },
-  { value: 4, label: '全遮' },
-];
-
-function maskMemoryText(text, level) {
-  const clean = stripTags(text);
-  if (!level) return clean;
-  const kind = getTextKind(clean);
-  const shouldHide = (index) => {
-    if (level === 1) return index % 4 === 0;
-    if (level === 2) return index % 2 === 0;
-    if (level === 3) return index % 4 !== 1;
-    return true;
-  };
-  if (kind === 'cjk') {
-    let count = 0;
-    return Array.from(clean).map((ch) => {
-      if (!/[\u4e00-\u9fff]/.test(ch)) return ch;
-      const hidden = shouldHide(count);
-      count += 1;
-      return hidden ? '＿' : ch;
-    }).join('');
-  }
-  let count = 0;
-  return clean.split(/([A-Za-z']+)/g).map((part) => {
-    if (!/^[A-Za-z']+$/.test(part)) return part;
-    const hidden = shouldHide(count);
-    count += 1;
-    return hidden ? '____' : part;
-  }).join('');
-}
-
-function normalizeMemoryText(text) {
-  return stripTags(text).replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase();
-}
-
-function MemoryMode({ source }) {
-  const [level, setLevel] = useState(2);
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [answer, setAnswer] = useState('');
-
-  useEffect(() => {
-    setLevel(2);
-    setShowAnswer(false);
-    setAnswer('');
-  }, [source?.title, source?.text]);
-
-  if (!source?.text) return null;
-  const masked = maskMemoryText(source.text, level);
-  const normalizedAnswer = normalizeMemoryText(answer);
-  const normalizedSource = normalizeMemoryText(source.text);
-  const isCorrect = normalizedAnswer && normalizedAnswer === normalizedSource;
-
-  return (
-    <section style={{ ...S.actionBar, borderTop: 'none', borderBottom: '1px solid var(--border-soft)', padding: '12px 16px', display: 'grid', gap: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div>
-          <strong style={{ color: 'var(--heading-text)', fontSize: 15 }}>背經模式</strong>
-          <span style={{ color: 'var(--muted-text)', fontSize: 12, marginLeft: 8 }}>{source.title}</span>
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {MEMORY_LEVELS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setLevel(item.value)}
-              style={level === item.value ? { ...S.pillActive, padding: '5px 10px', fontSize: 12 } : { ...S.smallBtn, borderRadius: 999 }}
-            >
-              {item.label}
-            </button>
-          ))}
-          <button type="button" onClick={() => setShowAnswer((v) => !v)} style={S.smallBtn}>{showAnswer ? '隱藏答案' : '顯示答案'}</button>
-        </div>
-      </div>
-      <div style={{ color: 'var(--page-text)', fontSize: 17, lineHeight: 1.9, background: 'var(--surface-solid)', border: '1px solid var(--border-muted)', borderRadius: 8, padding: 12, overflowWrap: 'anywhere' }}>
-        {showAnswer ? source.text : masked}
-      </div>
-      <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="填空默寫..." style={{ ...S.textarea, minHeight: 58 }} />
-      {answer && (
-        <div style={{ color: isCorrect ? 'var(--subtle-text)' : 'var(--warning-text)', fontSize: 13, fontWeight: 800 }}>
-          {isCorrect ? '完全符合' : '尚未完全符合'}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function getRecordForVerse(result, chap, sec, chineses) {
   return result.record?.find((r) => r.sec === sec && (!chap || r.chap === chap) && (!chineses || r.chineses === chineses));
 }
@@ -1271,7 +1188,7 @@ function getBaseTextForVerse(results, chap, sec, chineses, baseVersion) {
   return record ? record.bible_text : '';
 }
 
-function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled, diffBase, copyFormat, setCopyFormat }) {
+function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, diffEnabled, diffBase, copyFormat, setCopyFormat }) {
   const { results } = data;
   const [selected, setSelected] = useState(new Set());
   const verseNums = useMemo(() => {
@@ -1281,8 +1198,20 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
   }, [results]);
   const cols = results.length;
   const bookName = getBookName(data.abbrev);
+  const [openXrefs, setOpenXrefs] = useState(new Set());
 
-  useEffect(() => setSelected(new Set()), [data]);
+  useEffect(() => {
+    setSelected(new Set());
+    setOpenXrefs(new Set());
+  }, [data]);
+
+  const toggleXref = (key) => {
+    setOpenXrefs((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
 
   const toggleVerse = (n) => {
     const next = new Set(selected);
@@ -1331,23 +1260,14 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
     return formatVersesForShare(lines, copyFormat);
   }, [results, bookName, data.chap, copyFormat]);
 
-  const memorySource = useMemo(() => {
-    const target = selected.size > 0 ? Array.from(selected).sort((a, b) => a - b)[0] : verseNums[0];
-    const firstResult = results[0];
-    const vd = firstResult?.record?.find((r) => r.sec === target);
-    const vi = VERSIONS.find((v) => v.id === firstResult?.version);
-    if (!vd?.bible_text || vd.bible_text === '--') return null;
-    return { title: `${bookName} ${data.chap}:${target}${vi?.label ? ` · ${vi.label}` : ''}`, text: stripTags(vd.bible_text) };
-  }, [selected, verseNums, results, bookName, data.chap]);
-
   useEffect(() => {
     const handler = () => {
       const text = getSelectedText();
       if (text) {
         copyToClipboard(text);
-        window.alert('已複製勾選的經文');
+        showToast('已複製勾選的經文');
       } else {
-        window.alert('請先勾選要複製的經文');
+        showToast('請先勾選要複製的經文');
       }
     };
     document.addEventListener('global-copy', handler);
@@ -1360,7 +1280,6 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
     <div style={S.resultCard}>
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
       <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
-      <MemoryMode source={memorySource} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verseNums.length && verseNums.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -1372,10 +1291,8 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
       </div>
       <div>
         {verseNums.map((vNum) => {
-          const reference = makeReference(data.abbrev, Number(data.chap), vNum);
-          const annotation = annotations[getVerseKey(reference)];
           const baseText = getBaseTextForVerse(results, null, vNum, null, diffBase);
-          const rowBackground = selected.has(vNum) ? 'var(--selected-row-bg)' : softColor(annotation?.color);
+          const rowBackground = selected.has(vNum) ? 'var(--selected-row-bg)' : 'transparent';
           return (
             <div key={vNum} style={{ borderBottom: '1px solid var(--row-border)', background: rowBackground, transition: 'background 0.15s' }}>
               <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
@@ -1386,6 +1303,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                       第 {vNum} 節
                     </a>
                     <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
+                    <XrefButton open={openXrefs.has(vNum)} onToggle={() => toggleXref(vNum)} />
                     <CopyVerseButton
                       getText={() => {
                         const sel = getSelectedText();
@@ -1395,7 +1313,6 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                     />
                     <SpeakButton getText={() => getSingleVerseText(vNum)} />
                   </div>
-                  <AnnotationEditor reference={reference} annotation={annotation} onChange={onAnnotationChange} />
                 </div>
                 {results.map((res) => {
                   const vd = res.record?.find((r) => r.sec === vNum);
@@ -1413,6 +1330,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                   );
                 })}
               </div>
+              {openXrefs.has(vNum) && <XrefPanel abbrev={data.abbrev} chap={Number(data.chap)} sec={vNum} onNavigate={onNavigate} />}
             </div>
           );
         })}
@@ -1426,7 +1344,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
 
 const PAGE_SIZE = 50;
 
-function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, onAnnotationChange, diffEnabled, diffBase, copyFormat, setCopyFormat }) {
+function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, diffBase, copyFormat, setCopyFormat }) {
   const { results, keyword } = data;
   const [selected, setSelected] = useState(new Set());
   const [topCopied, setTopCopied] = useState(false);
@@ -1460,8 +1378,10 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
   }), [verses, resultScope, bookFilter]);
   const bookOptions = useMemo(() => Array.from(new Map(verses.map((verse) => [verse.localAbbrev, verse])).values()), [verses]);
   const selectedVisibleCount = filteredVerses.filter((verse) => selected.has(verse.key)).length;
-  const totalCount = activeResults.reduce((sum, result) => sum + (Number.isInteger(result.matchedCount) ? result.matchedCount : (result.record?.length || 0)), 0);
+  const totalCount = results.reduce((sum, result) => sum + (Number.isInteger(result.matchedCount) ? result.matchedCount : 0), 0);
   const cols = activeResults.length;
+
+  const [openXrefs, setOpenXrefs] = useState(new Set());
 
   useEffect(() => {
     setSelected(new Set());
@@ -1469,7 +1389,16 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
     setResultScope('all');
     setBookFilter('');
     setVersionFilter('all');
+    setOpenXrefs(new Set());
   }, [data]);
+
+  const toggleXref = (key) => {
+    setOpenXrefs((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
 
   const visibleVerses = useMemo(() => filteredVerses.slice(0, displayLimit), [filteredVerses, displayLimit]);
   const hasMore = filteredVerses.length > displayLimit;
@@ -1524,15 +1453,6 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
     return formatVersesForShare(lines, copyFormat);
   }, [filteredVerses, activeResults, copyFormat]);
 
-  const memorySource = useMemo(() => {
-    const target = filteredVerses.find((verse) => selected.has(verse.key)) || visibleVerses[0] || filteredVerses[0];
-    const firstResult = activeResults[0];
-    const vd = target && firstResult?.record?.find((r) => r.localAbbrev === target.localAbbrev && r.chap === target.chap && r.sec === target.sec);
-    const vi = VERSIONS.find((v) => v.id === firstResult?.version);
-    if (!target || !vd?.bible_text || vd.bible_text === '--') return null;
-    return { title: `${getBookName(target.localAbbrev)} ${target.chap}:${target.sec}${vi?.label ? ` · ${vi.label}` : ''}`, text: stripTags(vd.bible_text) };
-  }, [filteredVerses, visibleVerses, selected, activeResults]);
-
   const handleTopCopy = useCallback(async () => {
     const text = getFilteredText();
     if (text) {
@@ -1546,11 +1466,11 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
     const handler = () => {
       if (selected.size === 0) {
         handleTopCopy();
-        window.alert('已複製全部經文');
+        showToast('已複製全部經文');
       } else {
         const text = getSelectedText();
         copyToClipboard(text);
-        window.alert('已複製勾選的經文');
+        showToast('已複製勾選的經文');
       }
     };
     document.addEventListener('global-copy', handler);
@@ -1575,8 +1495,8 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginLeft: 'auto' }}>
           {activeResults.map((r) => {
             const vi = VERSIONS.find((v) => v.id === r.version);
-            const count = Number.isInteger(r.matchedCount) ? r.matchedCount : (r.record?.length ?? 0);
-            return <span key={r.version} style={{ fontSize: 11, border: '1px solid var(--warning-border)', color: VERSION_COLORS[r.version] || 'var(--warning-strong-text)', borderRadius: 999, padding: '2px 8px', fontWeight: 700, background: 'var(--warning-bg)' }}>{vi?.label}: {count}</span>;
+            const searched = Number.isInteger(r.matchedCount);
+            return <span key={r.version} style={{ fontSize: 11, border: '1px solid var(--warning-border)', color: VERSION_COLORS[r.version] || 'var(--warning-strong-text)', borderRadius: 999, padding: '2px 8px', fontWeight: 700, background: 'var(--warning-bg)' }}>{vi?.label}: {searched ? r.matchedCount : '對照'}</span>;
           })}
         </div>
       </div>
@@ -1603,7 +1523,6 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
         <button type="button" onClick={() => { setResultScope('all'); setBookFilter(''); setVersionFilter('all'); }} style={S.smallBtn}>重置</button>
       </div>
       <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
-      <MemoryMode source={memorySource} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selectedVisibleCount === filteredVerses.length && filteredVerses.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -1616,10 +1535,8 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
       <div>
         {filteredVerses.length === 0 && <EmptyState text="目前篩選沒有結果" />}
         {visibleVerses.map((vo) => {
-          const reference = makeReference(vo.localAbbrev, vo.chap, vo.sec);
-          const annotation = annotations[getVerseKey(reference)];
           const baseText = getBaseTextForVerse(activeResults, vo.chap, vo.sec, vo.chineses, diffBase);
-          const rowBackground = selected.has(vo.key) ? 'var(--keyword-selected-row-bg)' : softColor(annotation?.color);
+          const rowBackground = selected.has(vo.key) ? 'var(--keyword-selected-row-bg)' : 'transparent';
           return (
             <div key={vo.key} style={{ borderBottom: '1px solid var(--row-border)', background: rowBackground, transition: 'background 0.15s' }}>
               <div className="responsive-row" style={{ display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: 16 }}>
@@ -1630,6 +1547,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
                       {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
                     </a>
                     <FhlLink abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} />
+                    <XrefButton open={openXrefs.has(vo.key)} onToggle={() => toggleXref(vo.key)} />
                     <CopyVerseButton
                       getText={() => {
                         const sel = getSelectedText();
@@ -1639,7 +1557,6 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
                     />
                     <SpeakButton getText={() => getSingleVerseTextForKeyword(vo)} />
                   </div>
-                  <AnnotationEditor reference={reference} annotation={annotation} onChange={onAnnotationChange} />
                 </div>
                 {activeResults.map((res) => {
                   const vd = res.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
@@ -1656,6 +1573,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, annotations, o
                   );
                 })}
               </div>
+              {openXrefs.has(vo.key) && <XrefPanel abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} onNavigate={onNavigate} />}
             </div>
           );
         })}
@@ -1704,65 +1622,6 @@ function formatPlanEntries(entries) {
   return entries.map((entry) => `${getBookName(entry.abbrev)} ${entry.chap}`).join('、');
 }
 
-function DailyVerseCard({ versions, onNavigate }) {
-  const [dailySeed] = useState(() => Math.floor(Date.now() / 86400000));
-  const [offset, setOffset] = useState(0);
-  const [dailyData, setDailyData] = useState(null);
-  const [dailyLoading, setDailyLoading] = useState(false);
-  const ref = DAILY_VERSE_REFS[(dailySeed + offset) % DAILY_VERSE_REFS.length];
-  const dailyVersions = useMemo(() => (versions.includes('unv') ? ['unv'] : [versions[0] || 'unv']), [versions]);
-
-  useEffect(() => {
-    let active = true;
-    setDailyLoading(true);
-    fetchBible(ref, dailyVersions, {})
-      .then((res) => {
-        if (active) setDailyData(res);
-      })
-      .catch(() => {
-        if (active) setDailyData(null);
-      })
-      .finally(() => {
-        if (active) setDailyLoading(false);
-      });
-    return () => { active = false; };
-  }, [ref, dailyVersions]);
-
-  const cardText = useMemo(() => {
-    if (!dailyData?.results?.length) return '';
-    const lines = [];
-    dailyData.results.forEach((res) => {
-      const vi = VERSIONS.find((v) => v.id === res.version);
-      res.record?.forEach((r) => {
-        if (r.bible_text && r.bible_text !== '--') {
-          lines.push({ ref: `[${vi?.label}] ${getBookName(dailyData.abbrev)} ${dailyData.chap}:${r.sec}`, text: stripTags(r.bible_text) });
-        }
-      });
-    });
-    return formatVersesForShare(lines, 'plain');
-  }, [dailyData]);
-
-  return (
-    <section style={{ ...S.card, padding: 16, minWidth: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-        <h2 style={{ margin: 0, color: 'var(--heading-text)', fontSize: 18 }}>每日金句</h2>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => setOffset((n) => n + 1)} style={S.smallBtn}>下一則</button>
-          <button type="button" onClick={() => onNavigate(ref)} style={S.smallBtn}>開啟</button>
-        </div>
-      </div>
-      <div style={{ color: 'var(--muted-text)', fontSize: 12, marginBottom: 8 }}>{ref}</div>
-      <div style={{ color: 'var(--page-text)', fontSize: 16, lineHeight: 1.8, minHeight: 58, overflowWrap: 'anywhere' }}>
-        {dailyLoading ? '載入中...' : cardText || '暫時無法載入今日經文'}
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-        <button type="button" onClick={() => speakText(cardText)} disabled={!cardText} style={S.smallBtn}>朗讀</button>
-        <button type="button" onClick={() => downloadVerseCardFromText(cardText, '每日金句')} disabled={!cardText} style={S.smallBtn}>匯出 PNG</button>
-      </div>
-    </section>
-  );
-}
-
 function DailyReadingCard({ bibleStructure, readingProgress, setReadingProgress, onNavigate }) {
   const plan = useMemo(() => buildReadingPlan(bibleStructure), [bibleStructure]);
   const today = new Date();
@@ -1806,21 +1665,192 @@ function DailyReadingCard({ bibleStructure, readingProgress, setReadingProgress,
   );
 }
 
-function DailyTools({ versions, bibleStructure, readingProgress, setReadingProgress, onNavigate }) {
+function DailyTools({ bibleStructure, readingProgress, setReadingProgress, onNavigate }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, maxWidth: 1180, margin: '0 auto 22px' }}>
-      <DailyVerseCard versions={versions} onNavigate={onNavigate} />
       <DailyReadingCard bibleStructure={bibleStructure} readingProgress={readingProgress} setReadingProgress={setReadingProgress} onNavigate={onNavigate} />
     </div>
   );
 }
 
-function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDeleteHistory, onRunAnnotation, onDeleteAnnotation, onExport, onImport }) {
+const FOOTPRINT_RANGES = [
+  { id: '1m', label: '本月', months: 1 },
+  { id: '3m', label: '近3月', months: 3 },
+  { id: '6m', label: '近6月', months: 6 },
+  { id: '12m', label: '近12月', months: 12 },
+  { id: 'all', label: '歷年', months: 0 },
+];
+
+const FOOTPRINT_CELL_COLORS = ['var(--progress-track)', '#a5d6a7', '#66bb6a', '#2e7d32', '#1b5e20'];
+
+function footprintLevel(count) {
+  if (!count) return 0;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  if (count <= 4) return 3;
+  return 4;
+}
+
+function FootprintCard({ readingLog, onToggle, onClear, bibleStructure, onNavigate }) {
+  const [rangeId, setRangeId] = useState('3m');
+  const enabled = readingLog?.enabled !== false;
+  const rangeDef = FOOTPRINT_RANGES.find((r) => r.id === rangeId) || FOOTPRINT_RANGES[1];
+
+  const aggregate = useMemo(() => {
+    const m = readingLog?.m || {};
+    let keys;
+    if (rangeDef.months === 0) {
+      keys = Object.keys(m);
+    } else {
+      keys = [];
+      const now = new Date();
+      for (let i = 0; i < rangeDef.months; i += 1) {
+        keys.push(ymKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+      }
+    }
+    const counts = new Map();
+    keys.forEach((key) => {
+      Object.entries(m[key] || {}).forEach(([chapterKey, n]) => {
+        counts.set(chapterKey, (counts.get(chapterKey) || 0) + n);
+      });
+    });
+    return counts;
+  }, [readingLog, rangeDef]);
+
+  const allTimeChapterCount = useMemo(() => {
+    const seen = new Set();
+    Object.values(readingLog?.m || {}).forEach((bucket) => Object.keys(bucket).forEach((k) => seen.add(k)));
+    return seen.size;
+  }, [readingLog]);
+
+  const streak = useMemo(() => {
+    const d = readingLog?.d || {};
+    let count = 0;
+    const cursor = new Date();
+    if (!d[ymdKey(cursor)]) cursor.setDate(cursor.getDate() - 1);
+    while (d[ymdKey(cursor)]) {
+      count += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return count;
+  }, [readingLog]);
+
+  const todayCount = (readingLog?.d || {})[ymdKey(new Date())] || 0;
+  const totalChapters = useMemo(() => (
+    Array.isArray(bibleStructure)
+      ? bibleStructure.reduce((sum, b) => sum + (b.chapters?.length || 0), 0)
+      : 1189
+  ), [bibleStructure]);
+  const percent = totalChapters > 0 ? Math.round((allTimeChapterCount / totalChapters) * 1000) / 10 : 0;
+
+  const topChapters = useMemo(() => (
+    Array.from(aggregate.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([key, count]) => {
+        const [bi, chap] = key.split(':').map(Number);
+        const book = bookMap[bi];
+        return book ? { key, count, label: `${book.names[0]} ${chap}`, query: `${book.names[0]} ${chap}` } : null;
+      })
+      .filter(Boolean)
+  ), [aggregate]);
+
+  const rangeTotal = useMemo(() => Array.from(aggregate.values()).reduce((sum, n) => sum + n, 0), [aggregate]);
+
+  const statBox = { background: 'var(--panel-bg)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: '10px 12px', textAlign: 'center', minWidth: 0 };
+  const statNum = { fontSize: 22, fontWeight: 800, color: 'var(--heading-text)' };
+  const statLabel = { fontSize: 12, color: 'var(--muted-text)', marginTop: 2 };
+
+  return (
+    <div style={{ ...S.card, maxWidth: 1180, margin: '0 auto 22px', padding: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <h2 style={{ margin: 0, color: 'var(--heading-text)', fontSize: 18 }}>讀經足跡</h2>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button type="button" onClick={onToggle} style={S.smallBtn}>{enabled ? '停用記錄' : '重新啟用'}</button>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('確定要清除全部讀經足跡嗎？此動作無法復原。')) onClear();
+            }}
+            style={S.dangerBtn}
+          >
+            清除全部
+          </button>
+        </div>
+      </div>
+      <div style={{ color: 'var(--muted-text)', fontSize: 12, marginBottom: 12 }}>
+        閱讀整章並停留 15 秒才會自動記錄；單節查詢、關鍵字搜尋與開啟 App 自動還原不計。記錄只存在這台裝置。
+      </div>
+      {!enabled && (
+        <div style={{ background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 10, padding: 14, color: 'var(--warning-text)', fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+          足跡記錄已停用，既有記錄仍保留。按「重新啟用」可繼續記錄。
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 14 }}>
+        <div style={statBox}><div style={statNum}>{todayCount}</div><div style={statLabel}>今日章次</div></div>
+        <div style={statBox}><div style={statNum}>{streak}</div><div style={statLabel}>連續天數</div></div>
+        <div style={statBox}><div style={statNum}>{allTimeChapterCount}</div><div style={statLabel}>讀過章數</div></div>
+        <div style={statBox}><div style={statNum}>{percent}%</div><div style={statLabel}>全卷 {totalChapters} 章</div></div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+        {FOOTPRINT_RANGES.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            onClick={() => setRangeId(r.id)}
+            style={rangeId === r.id ? { ...S.pillActive, padding: '5px 12px', fontSize: 12 } : { ...S.smallBtn, borderRadius: 999 }}
+          >
+            {r.label}
+          </button>
+        ))}
+        <span style={{ fontSize: 12, color: 'var(--muted-text)' }}>{rangeDef.label}共 {rangeTotal} 章次</span>
+      </div>
+      {topChapters.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <h3 style={{ margin: '0 0 8px', color: 'var(--subtle-text)', fontSize: 14 }}>熱區排行（點擊開啟）</h3>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {topChapters.map((item) => (
+              <button key={item.key} type="button" onClick={() => onNavigate(item.query)} style={{ ...S.smallBtn, borderRadius: 999 }}>
+                {item.label} · {item.count}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <h3 style={{ margin: '0 0 8px', color: 'var(--subtle-text)', fontSize: 14 }}>全卷熱圖（點格子開啟該章）</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 320, overflow: 'auto', paddingRight: 4 }}>
+        {bookMap.map((book, bi) => {
+          const struct = Array.isArray(bibleStructure) ? bibleStructure.find((b) => b.abbrev === book.localAbbrev) : null;
+          const chapCount = struct?.chapters?.length || 0;
+          if (chapCount === 0) return null;
+          return (
+            <div key={book.localAbbrev} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <span style={{ fontSize: 10, color: 'var(--muted-text)', width: 52, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.names[0]}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                {Array.from({ length: chapCount }, (_, i) => {
+                  const chap = i + 1;
+                  const count = aggregate.get(`${bi}:${chap}`) || 0;
+                  return (
+                    <button
+                      key={chap}
+                      type="button"
+                      onClick={() => onNavigate(`${book.names[0]} ${chap}`)}
+                      title={`${book.names[0]} ${chap} 章 · ${count} 次`}
+                      style={{ width: 11, height: 11, padding: 0, border: 'none', borderRadius: 2, cursor: 'pointer', background: FOOTPRINT_CELL_COLORS[footprintLevel(count)] }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function UserLibrary({ history, onRunHistory, onClearHistory, onDeleteHistory, onExport, onImport }) {
   const fileInputRef = useRef(null);
-  const annotationItems = useMemo(() => Object.entries(annotations)
-    .map(([key, value]) => ({ key, ...value }))
-    .filter((item) => item.favorite || item.note || item.color)
-    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)), [annotations]);
 
   const handleFile = (e) => {
     const file = e.target.files?.[0];
@@ -1829,9 +1859,9 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
     reader.onload = () => {
       try {
         onImport(JSON.parse(reader.result));
-        window.alert('匯入完成');
+        showToast('匯入完成');
       } catch {
-        window.alert('匯入失敗：JSON 格式不正確');
+        showToast('匯入失敗：JSON 格式不正確');
       }
       e.target.value = '';
     };
@@ -1841,7 +1871,7 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
   return (
     <div style={{ ...S.card, maxWidth: 1180, margin: '0 auto 22px', padding: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-        <h2 style={{ margin: 0, color: 'var(--heading-text)', fontSize: 18 }}>我的查詢與筆記</h2>
+        <h2 style={{ margin: 0, color: 'var(--heading-text)', fontSize: 18 }}>查詢足跡</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={onExport} style={S.smallBtn}>匯出 JSON</button>
           <button type="button" onClick={() => fileInputRef.current?.click()} style={S.smallBtn}>匯入 JSON</button>
@@ -1869,23 +1899,42 @@ function UserLibrary({ history, annotations, onRunHistory, onClearHistory, onDel
             ))}
           </div>
         </section>
-        <section style={{ background: 'var(--panel-bg)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: 12, minWidth: 0, overflow: 'hidden' }}>
-          <h3 style={{ margin: '0 0 8px', color: 'var(--subtle-text)', fontSize: 15 }}>收藏 / 筆記 / 螢光筆</h3>
-          {annotationItems.length === 0 && <p style={{ margin: 0, color: 'var(--muted-text)', fontSize: 13 }}>在經文旁可收藏、標色與寫筆記。</p>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
-            {annotationItems.slice(0, 30).map((item) => (
-              <div key={item.key} style={{ border: '1px solid var(--border-muted)', borderRadius: 8, padding: 8, background: item.color || 'var(--surface-solid)', minWidth: 0, overflow: 'hidden' }}>
-                <button type="button" onClick={() => onRunAnnotation(item)} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-                  <strong style={{ color: 'var(--page-text)', fontSize: 14 }}>{item.label}</strong>
-                  <div style={{ color: 'var(--soft-text)', fontSize: 12, marginTop: 3 }}>{item.favorite ? '已收藏' : '已標記'} · {formatDateTime(item.updatedAt)}</div>
-                  {item.note && <p style={{ margin: '6px 0 0', color: 'var(--page-text)', fontSize: 13, lineHeight: 1.45, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{item.note}</p>}
-                </button>
-                <button type="button" onClick={() => onDeleteAnnotation(item)} style={{ ...S.dangerBtn, marginTop: 6 }}>刪除</button>
-              </div>
-            ))}
-          </div>
-        </section>
       </div>
+    </div>
+  );
+}
+
+const VIEW_TABS = [
+  { id: 'home', label: '查詢' },
+  { id: 'library', label: '讀經進度與足跡' },
+];
+
+function ViewTabs({ view, setView }) {
+  return (
+    <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center', padding: 4, border: '1px solid var(--border-strong)', borderRadius: 999, background: 'var(--panel-bg)' }}>
+      {VIEW_TABS.map((tab) => {
+        const active = view === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setView(tab.id)}
+            style={{
+              border: active ? '1px solid #2e7d32' : '1px solid transparent',
+              background: active ? 'linear-gradient(145deg, #43a047, #2e7d32)' : 'transparent',
+              color: active ? 'white' : 'var(--heading-text)',
+              borderRadius: 999,
+              padding: '6px 12px',
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -1968,23 +2017,32 @@ export default function App() {
   const [diffEnabled, setDiffEnabled] = usePersistentState(LS_KEYS.diffEnabled, true);
   const [diffBase, setDiffBase] = usePersistentState(LS_KEYS.diffBase, '');
   const [history, setHistory] = usePersistentState(LS_KEYS.history, []);
-  const [annotations, setAnnotations] = usePersistentState(LS_KEYS.annotations, {});
   const [bibleStructure, setBibleStructure] = useState(null);
+  const [view, setView] = useState('home');
   const [bookmark, setBookmark] = usePersistentState(LS_KEYS.bookmark, null);
   const [copyFormat, setCopyFormat] = usePersistentState(LS_KEYS.copyFormat, 'plain');
   const [theme, setTheme] = usePersistentState(LS_KEYS.theme, 'light');
   const [readingProgress, setReadingProgress] = usePersistentState(LS_KEYS.readingProgress, {});
+  const [readingLog, setReadingLog] = usePersistentState(LS_KEYS.readingLog, { enabled: true, m: {}, d: {}, recent: {} });
   const [systemDark, setSystemDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches || false);
   const normalizedTheme = normalizeThemePreference(theme);
   const resolvedTheme = resolveTheme(theme, systemDark);
   const themeVars = useMemo(() => THEME_VARS[resolvedTheme] || THEME_VARS.light, [resolvedTheme]);
   const searchSeqRef = useRef(0);
+  const footprintSkipRef = useRef(false);
 
   useEffect(() => {
-    fetch('/data/unv.json')
-      .then((r) => r.json())
-      .then((structure) => setBibleStructure(structure))
-      .catch((err) => console.error('Error loading bible structure:', err));
+    const expand = (list) => list.map((book) => ({
+      abbrev: book.abbrev,
+      chapters: book.chapters.map((c) => (Array.isArray(c) ? c : Array.from({ length: c }))),
+    }));
+    fetch('/data/structure.json')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no structure.json'))))
+      .then((structure) => setBibleStructure(expand(structure)))
+      .catch(() => fetch('/data/unv.json')
+        .then((r) => r.json())
+        .then((structure) => setBibleStructure(structure))
+        .catch((err) => console.error('Error loading bible structure:', err)));
   }, []);
 
   useEffect(() => {
@@ -2019,6 +2077,7 @@ export default function App() {
   const handleSearch = useCallback(async (query, selectedVersions = versions, searchOptions = {}) => {
     const t0 = performance.now();
     const seq = ++searchSeqRef.current;
+    setView('home');
     setLoading(true);
     setError(null);
     try {
@@ -2043,12 +2102,14 @@ export default function App() {
     const resume = params.get('resume');
     if (resume === '1' && bookmark) {
       initialUrlSearchedRef.current = true;
+      footprintSkipRef.current = true;
       handleSearch(bookmark.label, versions, {});
       return;
     }
     const q = params.get('q');
     if (!q) return;
     initialUrlSearchedRef.current = true;
+    footprintSkipRef.current = true;
     const vParam = params.get('v');
     const urlVersions = vParam
       ? vParam.split(',').map((s) => s.trim()).filter((s) => VERSIONS.find((vv) => vv.id === s))
@@ -2056,6 +2117,58 @@ export default function App() {
     if (urlVersions && urlVersions.length > 0) setVersions(urlVersions);
     handleSearch(q, urlVersions && urlVersions.length > 0 ? urlVersions : versions, {});
   }, [handleSearch, setVersions, versions, bookmark]);
+
+  const commitReadingLog = useCallback((abbrev, chap) => {
+    const bookIndex = bookMap.findIndex((b) => b.localAbbrev === abbrev);
+    if (bookIndex < 0 || !Number.isInteger(chap) || chap < 1) return;
+    const chapterKey = `${bookIndex}:${chap}`;
+    const now = Date.now();
+    setReadingLog((prev) => {
+      const log = prev && typeof prev === 'object' ? prev : {};
+      if (log.enabled === false) return prev;
+      const recent = {};
+      Object.entries(log.recent || {}).forEach(([k, ts]) => {
+        if (now - ts < FOOTPRINT_RECENT_TTL_MS) recent[k] = ts;
+      });
+      if (recent[chapterKey] && now - recent[chapterKey] < FOOTPRINT_DEDUPE_MS) {
+        return { ...log, recent };
+      }
+      recent[chapterKey] = now;
+      const date = new Date(now);
+      const ym = ymKey(date);
+      const ymd = ymdKey(date);
+      const monthBucket = { ...((log.m || {})[ym] || {}) };
+      monthBucket[chapterKey] = (monthBucket[chapterKey] || 0) + 1;
+      return {
+        ...log,
+        m: { ...(log.m || {}), [ym]: monthBucket },
+        d: { ...(log.d || {}), [ymd]: ((log.d || {})[ymd] || 0) + 1 },
+        recent,
+      };
+    });
+  }, [setReadingLog]);
+
+  useEffect(() => {
+    if (!data) return undefined;
+    const skip = footprintSkipRef.current;
+    footprintSkipRef.current = false;
+    if (skip || data.mode !== 'verse' || data.sec) return undefined;
+    const abbrev = data.abbrev;
+    const chap = parseInt(data.chap, 10);
+    const timer = window.setTimeout(() => commitReadingLog(abbrev, chap), FOOTPRINT_DWELL_MS);
+    return () => window.clearTimeout(timer);
+  }, [data, commitReadingLog]);
+
+  const toggleReadingLog = useCallback(() => {
+    setReadingLog((prev) => {
+      const log = prev && typeof prev === 'object' ? prev : {};
+      return { ...log, enabled: log.enabled === false };
+    });
+  }, [setReadingLog]);
+
+  const clearReadingLog = useCallback(() => {
+    setReadingLog((prev) => ({ enabled: (prev && typeof prev === 'object' ? prev.enabled : true) !== false, m: {}, d: {}, recent: {} }));
+  }, [setReadingLog]);
 
   useEffect(() => {
     if (!data) return;
@@ -2151,55 +2264,28 @@ export default function App() {
     return () => document.removeEventListener('keydown', handler);
   }, [data, bibleStructure, handleSearch, versions]);
 
-  const updateAnnotation = useCallback((reference, patch) => {
-    setAnnotations((prev) => {
-      const key = getVerseKey(reference);
-      if (patch.clear) {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      }
-      const nextItem = {
-        ...(prev[key] || {}),
-        ...reference,
-        ...patch,
-        updatedAt: new Date().toISOString(),
-      };
-      const isEmpty = !nextItem.favorite && !nextItem.note && !nextItem.color;
-      const next = { ...prev };
-      if (isEmpty) delete next[key];
-      else next[key] = nextItem;
-      return next;
-    });
-  }, [setAnnotations]);
-
-  const deleteAnnotation = useCallback((item) => {
-    setAnnotations((prev) => {
-      const next = { ...prev };
-      delete next[item.key || getVerseKey(item)];
-      return next;
-    });
-  }, [setAnnotations]);
-
   const runHistory = useCallback((item) => {
     if (Array.isArray(item.versions) && item.versions.length > 0) setVersions(item.versions);
     handleSearch(item.query, item.versions || versions, item.options || {});
   }, [handleSearch, setVersions, versions]);
 
-  const runAnnotation = useCallback((item) => {
-    const query = `${getBookName(item.abbrev)} ${item.chap}:${item.sec}`;
-    handleSearch(query, versions, {});
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [handleSearch, versions]);
-
   const exportData = useCallback(() => {
     const payload = {
       app: '多譯本聖經查詢',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       history,
-      annotations,
       readingProgress,
+      readingLog,
+      settings: {
+        versions,
+        fontSize,
+        theme,
+        copyFormat,
+        diffEnabled,
+        diffBase,
+        bookmark,
+      },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2208,20 +2294,48 @@ export default function App() {
     link.download = `bible-notes-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [history, annotations, readingProgress]);
+  }, [history, readingProgress, readingLog, versions, fontSize, theme, copyFormat, diffEnabled, diffBase, bookmark]);
 
   const importData = useCallback((payload) => {
     if (!payload || typeof payload !== 'object') throw new Error('Invalid payload');
     if (Array.isArray(payload.history)) {
       setHistory((prev) => [...payload.history, ...prev].slice(0, 80));
     }
-    if (payload.annotations && typeof payload.annotations === 'object') {
-      setAnnotations((prev) => ({ ...prev, ...payload.annotations }));
-    }
     if (payload.readingProgress && typeof payload.readingProgress === 'object') {
       setReadingProgress((prev) => ({ ...prev, ...payload.readingProgress }));
     }
-  }, [setHistory, setAnnotations, setReadingProgress]);
+    if (payload.readingLog && typeof payload.readingLog === 'object') {
+      setReadingLog((prev) => {
+        const log = prev && typeof prev === 'object' ? prev : {};
+        const incoming = payload.readingLog;
+        const m = { ...(log.m || {}) };
+        Object.entries(incoming.m || {}).forEach(([ym, bucket]) => {
+          m[ym] = { ...(m[ym] || {}) };
+          Object.entries(bucket || {}).forEach(([k, n]) => {
+            if (Number.isFinite(n)) m[ym][k] = (m[ym][k] || 0) + n;
+          });
+        });
+        const d = { ...(log.d || {}) };
+        Object.entries(incoming.d || {}).forEach(([ymd, n]) => {
+          if (Number.isFinite(n)) d[ymd] = (d[ymd] || 0) + n;
+        });
+        return { ...log, enabled: log.enabled !== false, m, d };
+      });
+    }
+    const settings = payload.settings;
+    if (settings && typeof settings === 'object') {
+      if (Array.isArray(settings.versions)) {
+        const valid = settings.versions.filter((id) => VERSIONS.some((v) => v.id === id));
+        if (valid.length > 0) setVersions(valid);
+      }
+      if (Number.isFinite(settings.fontSize)) setFontSize(Math.min(40, Math.max(10, settings.fontSize)));
+      if (typeof settings.theme === 'string') setTheme(settings.theme);
+      if (COPY_FORMAT_OPTIONS.some((o) => o.id === settings.copyFormat)) setCopyFormat(settings.copyFormat);
+      if (typeof settings.diffEnabled === 'boolean') setDiffEnabled(settings.diffEnabled);
+      if (typeof settings.diffBase === 'string') setDiffBase(settings.diffBase);
+      if (settings.bookmark && typeof settings.bookmark === 'object' && settings.bookmark.label) setBookmark(settings.bookmark);
+    }
+  }, [setHistory, setReadingProgress, setReadingLog, setVersions, setFontSize, setTheme, setCopyFormat, setDiffEnabled, setDiffBase, setBookmark]);
 
   return (
     <div id="top" data-theme={resolvedTheme} style={{ ...themeVars, ...S.bg, padding: 0, paddingTop: 56, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
@@ -2229,6 +2343,7 @@ export default function App() {
         <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} diffBase={diffBase} setDiffBase={setDiffBase} />
         <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed />
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+          <ViewTabs view={view} setView={setView} />
           <InstallButton />
           {bookmark && (
             <button
@@ -2242,62 +2357,70 @@ export default function App() {
           )}
           <ThemeModeControl theme={normalizedTheme} resolvedTheme={resolvedTheme} setTheme={setTheme} />
         </div>
-        <DailyTools
-          versions={versions}
-          bibleStructure={bibleStructure}
-          readingProgress={readingProgress}
-          setReadingProgress={setReadingProgress}
-          onNavigate={(q) => handleSearch(q, versions, {})}
-        />
-        <UserLibrary
-          history={history}
-          annotations={annotations}
-          onRunHistory={runHistory}
-          onClearHistory={() => setHistory([])}
-          onDeleteHistory={(id) => setHistory((prev) => prev.filter((item) => item.id !== id))}
-          onRunAnnotation={runAnnotation}
-          onDeleteAnnotation={deleteAnnotation}
-          onExport={exportData}
-          onImport={importData}
-        />
-        {error && <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: 'var(--danger-text)' }}>警告：{error}</div>}
-        {loading && <div style={{ textAlign: 'center', color: 'var(--subtle-text)', padding: '64px 0', fontSize: 18, fontWeight: 700 }}>搜尋中，請稍候...</div>}
-        {!loading && data && data.mode === 'verse' && (
-          <VerseViewer
-            data={data}
-            bibleStructure={bibleStructure}
-            onNavigate={(q) => handleSearch(q, versions, data.searchOptions || {})}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-            annotations={annotations}
-            onAnnotationChange={updateAnnotation}
-            diffEnabled={diffEnabled}
-            diffBase={diffBase}
-            copyFormat={copyFormat}
-            setCopyFormat={setCopyFormat}
-          />
+        {view === 'library' && (
+          <>
+            <DailyTools
+              bibleStructure={bibleStructure}
+              readingProgress={readingProgress}
+              setReadingProgress={setReadingProgress}
+              onNavigate={(q) => handleSearch(q, versions, {})}
+            />
+            <FootprintCard
+              readingLog={readingLog}
+              onToggle={toggleReadingLog}
+              onClear={clearReadingLog}
+              bibleStructure={bibleStructure}
+              onNavigate={(q) => handleSearch(q, versions, {})}
+            />
+            <UserLibrary
+              history={history}
+              onRunHistory={runHistory}
+              onClearHistory={() => setHistory([])}
+              onDeleteHistory={(id) => setHistory((prev) => prev.filter((item) => item.id !== id))}
+              onExport={exportData}
+              onImport={importData}
+            />
+          </>
         )}
-        {!loading && data && data.mode === 'keyword' && (
-          <KeywordViewer
-            data={data}
-            onNavigate={(q) => handleSearch(q, versions, data.searchOptions || {})}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-            annotations={annotations}
-            onAnnotationChange={updateAnnotation}
-            diffEnabled={diffEnabled}
-            diffBase={diffBase}
-            copyFormat={copyFormat}
-            setCopyFormat={setCopyFormat}
-          />
+        {view === 'home' && (
+          <>
+            {error && <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 12, padding: 16, textAlign: 'center', maxWidth: 900, margin: '0 auto 24px', fontSize: 14, color: 'var(--danger-text)' }}>警告：{error}</div>}
+            {loading && <div style={{ textAlign: 'center', color: 'var(--subtle-text)', padding: '64px 0', fontSize: 18, fontWeight: 700 }}>搜尋中，請稍候...</div>}
+            {!loading && data && data.mode === 'verse' && (
+              <VerseViewer
+                data={data}
+                bibleStructure={bibleStructure}
+                onNavigate={(q) => handleSearch(q, versions, data.searchOptions || {})}
+                fontSize={fontSize}
+                setFontSize={setFontSize}
+                diffEnabled={diffEnabled}
+                diffBase={diffBase}
+                copyFormat={copyFormat}
+                setCopyFormat={setCopyFormat}
+              />
+            )}
+            {!loading && data && data.mode === 'keyword' && (
+              <KeywordViewer
+                data={data}
+                onNavigate={(q) => handleSearch(q, versions, data.searchOptions || {})}
+                fontSize={fontSize}
+                setFontSize={setFontSize}
+                diffEnabled={diffEnabled}
+                diffBase={diffBase}
+                copyFormat={copyFormat}
+                setCopyFormat={setCopyFormat}
+              />
+            )}
+          </>
         )}
         <footer style={{ marginTop: 48, textAlign: 'center', color: 'var(--muted-text)', fontSize: 12, paddingBottom: 32 }}>
-          資料來源：信望愛 (FHL) 聖經、本機 JSON、8 種譯本離線可用
+          資料來源：信望愛 (FHL) 聖經、本機 JSON、8 種譯本離線可用 · 串珠資料：openbible.info (CC-BY)
           <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7 }}>
             build {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}
           </div>
         </footer>
       </div>
+      <Toast />
     </div>
   );
 }

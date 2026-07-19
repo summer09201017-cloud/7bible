@@ -16,6 +16,16 @@ export const VERSIONS = [
 const STRIP_SPACE_VERSIONS = ['unv'];
 const localCache = {};
 const nivBookCache = {};
+const xrefCache = {};
+
+export async function loadXref(localAbbrev) {
+  if (xrefCache[localAbbrev]) return xrefCache[localAbbrev];
+  const res = await fetch(`/data/xref/${localAbbrev}.json`);
+  if (!res.ok) throw new Error(`讀取串珠資料失敗`);
+  const data = await res.json();
+  xrefCache[localAbbrev] = data;
+  return data;
+}
 
 async function loadLocalBible(version) {
   if (localCache[version]) return localCache[version];
