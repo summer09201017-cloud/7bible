@@ -1892,7 +1892,7 @@ const VIEW_TABS = [
 
 function ViewTabs({ view, setView, big }) {
   return (
-    <div style={{ display: 'inline-flex', gap: big ? 6 : 4, flexWrap: 'wrap', justifyContent: 'center', padding: big ? 5 : 4, border: '1px solid var(--border-strong)', borderRadius: 999, background: 'var(--panel-bg)' }}>
+    <div style={{ display: 'inline-flex', gap: big ? 8 : 4, flexWrap: 'wrap', justifyContent: 'center' }}>
       {VIEW_TABS.map((tab) => {
         const active = view === tab.id;
         return (
@@ -1901,12 +1901,12 @@ function ViewTabs({ view, setView, big }) {
             type="button"
             onClick={() => setView(tab.id)}
             style={{
-              border: active ? '1px solid #2e7d32' : '1px solid transparent',
+              border: active ? '1px solid #2e7d32' : '1px solid var(--border-strong)',
               background: active ? 'linear-gradient(145deg, #43a047, #2e7d32)' : 'transparent',
               color: active ? 'white' : 'var(--heading-text)',
-              borderRadius: 999,
-              padding: big ? '9px 24px' : '6px 12px',
-              fontSize: big ? 17 : 12,
+              borderRadius: 8,
+              padding: big ? '5px 14px' : '6px 12px',
+              fontSize: big ? 13 : 12,
               fontWeight: 800,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
