@@ -813,7 +813,7 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
   );
 }
 
-function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure, diffEnabled, setDiffEnabled, diffBase, setDiffBase }) {
+function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure, diffEnabled, setDiffEnabled, diffBase, setDiffBase, topBarH = 56 }) {
   const [query, setQuery] = useState('');
   const [selBook, setSelBook] = useState('');
   const [selChap, setSelChap] = useState('');
@@ -908,7 +908,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
   }
 
   return (
-    <div style={{ ...S.card, padding: '72px 24px 24px', marginTop: -56, marginBottom: 0, borderRadius: 0, position: 'relative', zIndex: 5 }}>
+    <div style={{ ...S.card, padding: `${topBarH + 16}px 24px 24px`, marginTop: -topBarH, marginBottom: 0, borderRadius: 0, position: 'relative', zIndex: 5 }}>
       <div style={{ maxWidth: 980, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--heading-text)', textAlign: 'center', marginBottom: 18, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
         多譯本聖經查詢 <small style={{ fontSize: 13, color: 'var(--subtle-text)', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.5</small>
@@ -1146,7 +1146,7 @@ const btnFontSize = {
   minWidth: 40,
 };
 
-function FontSizeControl({ fontSize, setFontSize, fixed }) {
+function FontSizeControl({ fontSize, setFontSize, fixed, topSlot }) {
   const content = (
     <>
       <span style={{ fontSize: 13, color: 'var(--soft-text)', fontWeight: 700 }}>字型大小</span>
@@ -1159,8 +1159,9 @@ function FontSizeControl({ fontSize, setFontSize, fixed }) {
 
   if (fixed) {
     return (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', background: 'var(--topbar-bg)', padding: '8px 16px', borderBottom: '2px solid var(--border-strong)', boxShadow: 'var(--topbar-shadow)' }}>
-        {content}
+      <div id="app-top-bar" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'var(--topbar-bg)', padding: '8px 16px', borderBottom: '2px solid var(--border-strong)', boxShadow: 'var(--topbar-shadow)' }}>
+        {topSlot}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>{content}</div>
       </div>
     );
   }
@@ -1889,9 +1890,9 @@ const VIEW_TABS = [
   { id: 'library', label: '讀經進度與足跡' },
 ];
 
-function ViewTabs({ view, setView }) {
+function ViewTabs({ view, setView, big }) {
   return (
-    <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center', padding: 4, border: '1px solid var(--border-strong)', borderRadius: 999, background: 'var(--panel-bg)' }}>
+    <div style={{ display: 'inline-flex', gap: big ? 6 : 4, flexWrap: 'wrap', justifyContent: 'center', padding: big ? 5 : 4, border: '1px solid var(--border-strong)', borderRadius: 999, background: 'var(--panel-bg)' }}>
       {VIEW_TABS.map((tab) => {
         const active = view === tab.id;
         return (
@@ -1904,8 +1905,8 @@ function ViewTabs({ view, setView }) {
               background: active ? 'linear-gradient(145deg, #43a047, #2e7d32)' : 'transparent',
               color: active ? 'white' : 'var(--heading-text)',
               borderRadius: 999,
-              padding: '6px 12px',
-              fontSize: 12,
+              padding: big ? '9px 24px' : '6px 12px',
+              fontSize: big ? 17 : 12,
               fontWeight: 800,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
@@ -2005,6 +2006,7 @@ export default function App() {
   const [readingProgress, setReadingProgress] = usePersistentState(LS_KEYS.readingProgress, {});
   const [readingLog, setReadingLog] = usePersistentState(LS_KEYS.readingLog, { enabled: true, m: {}, d: {}, recent: {} });
   const [systemDark, setSystemDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches || false);
+  const [topBarH, setTopBarH] = useState(96);
   const normalizedTheme = normalizeThemePreference(theme);
   const resolvedTheme = resolveTheme(theme, systemDark);
   const themeVars = useMemo(() => THEME_VARS[resolvedTheme] || THEME_VARS.light, [resolvedTheme]);
@@ -2032,6 +2034,17 @@ export default function App() {
     sync();
     media.addEventListener?.('change', sync);
     return () => media.removeEventListener?.('change', sync);
+  }, []);
+
+  useEffect(() => {
+    const el = document.getElementById('app-top-bar');
+    if (!el) return undefined;
+    const update = () => setTopBarH(el.offsetHeight);
+    update();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   const addHistory = useCallback((query, selectedVersions, searchOptions, result) => {
@@ -2307,12 +2320,11 @@ export default function App() {
   }, [setHistory, setReadingProgress, setReadingLog, setVersions, setFontSize, setTheme, setCopyFormat, setDiffEnabled, setDiffBase, setBookmark]);
 
   return (
-    <div id="top" data-theme={resolvedTheme} style={{ ...themeVars, ...S.bg, padding: 0, paddingTop: 56, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+    <div id="top" data-theme={resolvedTheme} style={{ ...themeVars, ...S.bg, padding: 0, paddingTop: topBarH, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 16px' }}>
-        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} diffBase={diffBase} setDiffBase={setDiffBase} />
-        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed />
+        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} diffBase={diffBase} setDiffBase={setDiffBase} topBarH={topBarH} />
+        <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed topSlot={<ViewTabs view={view} setView={setView} big />} />
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
-          <ViewTabs view={view} setView={setView} />
           <InstallButton />
           {bookmark && (
             <button
