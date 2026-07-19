@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-Guidance for future Claude Code agents working in this repo.
+Guidance for future Codex agents working in this repo.
 
 ## 現況 (2026-07-19)
 
@@ -119,5 +119,5 @@ Two in-app tabs (`view` state, not persisted): `home` = search + results;
 
 ## Ideas explicitly NOT done yet
 
-- AI 釋義 (Claude API), Strong's, 靈修日記, 統計圖表, 上下文預覽 (keyword 結果行內展開該章前後節), Web Worker 搜尋索引, 語音輸入搜尋.
+- AI 釋義 (Codex API), Strong's, 靈修日記, 統計圖表, 上下文預覽 (keyword 結果行內展開該章前後節), Web Worker 搜尋索引, 語音輸入搜尋.
 - Splitting App.jsx, migrating to Tailwind, adding tests.

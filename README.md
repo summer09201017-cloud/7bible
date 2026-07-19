@@ -1,16 +1,59 @@
-# React + Vite
+# 多譯本聖經查詢
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+線上網址：**https://7bible.netlify.app/**
 
-Currently, two official plugins are available:
+一個純前端、可離線、可安裝到手機主畫面的聖經查詢工具。8 種譯本並排對照、關鍵字/章節查詢、串珠交叉引用、讀經進度與足跡追蹤。所有資料存在你自己的裝置上，沒有帳號、沒有伺服器、不收集任何個資。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 給老師 / 牧者：怎麼用
 
-## React Compiler
+### 查詢
+- **查章節**：在搜尋框輸入「約 3:16」「創 1」「Psalm 23」「John 3:16-18」都可以。
+- **查關鍵字**：輸入「愛心」「恩典」等詞就會搜尋整本聖經。可用進階搜尋切換「全部都要包含 / 任一即可」、精確片語、排除詞、限定舊約/新約或自訂書卷範圍。
+- **快速鍵**（電腦）：`/` 聚焦搜尋框、`j`/`k` 上下一章或一節、`c` 複製勾選經文、`Esc` 清除、`?` 顯示說明。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 譯本對照
+- 譯本按鈕一排 3 個，點選可開關；用 ◀▶ 調整顯示順序（順序就是畫面左右排列順序）。
+- 「差異高亮」可標出各譯本用字差異（中英文不互相比較）。
 
-## Expanding the ESLint configuration
+### 每一節的工具
+- **串珠**：展開該節的相關經文（交叉引用），點一下直接跳過去。
+- **註釋**：連到信望愛站（FHL）的註釋資料。
+- **複製 / 朗讀 / 匯出 PNG / 分享到 Line 或 Email**：可勾選多節後一次處理，複製格式可選純文字 / 單行 / Markdown / HTML。
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 「讀經進度與足跡」分頁
+- **讀經足跡**：你「讀整章並停留 15 秒」就會自動記錄，不用手動打卡。有今日章次、連續天數、讀過章數、全卷進度、熱區排行與整卷熱圖（點格子直接開那一章）。
+- **查詢歷史**：最近查過的都在這，點一下重查。
+- **每日讀經進度**：一年讀完聖經的每日進度，可打卡。
+- **匯出 / 匯入 JSON**：把足跡、歷史、進度和所有設定備份成一個檔，換手機時可還原。
+
+### 主題與安裝
+- 主題可選淺色 / 護眼 / 夜讀 / 跟隨系統。
+- 「安裝 App」可把它裝到手機主畫面：**先在有網路時安裝一次，之後在教室沒網路也能離線使用**。
+  - iPhone / iPad：Safari → 分享 → 加入主畫面
+  - Android：Chrome → 選單 → 安裝應用程式
+  - 電腦：Chrome / Edge 網址列的安裝圖示
+
+## 給開發者：跑起來 / 建置
+
+```
+npm install
+npm run dev       # 本機開發 http://localhost:5173
+npm run build     # 產出 → dist/
+npm run lint      # ESLint
+npm run preview   # 預覽 build 結果 http://localhost:4173
+```
+
+Windows 可雙擊 `啟動本機網站.bat`（跑 preview 並自動開瀏覽器）。
+
+**部署**：push 到 `main` 分支，Netlify 會自動 build + 上線，不需手動操作。
+
+## 技術
+
+React 19 + Vite 8（無 TypeScript）、純前端、localStorage 存狀態、Service Worker 離線快取。詳細架構與注意事項見 `CLAUDE.md`；規劃見 `roadmap.md`；換機交接見 `讀我-HANDOFF.txt`。
+
+## 資料來源
+
+- 聖經經文：信望愛 (FHL) 聖經、本機 JSON，8 種譯本離線可用。
+- 串珠交叉引用：openbible.info（CC-BY 授權）。
+
+> ⚠ 注意：NIV / ESV 譯本的公開散布授權尚未確認（見 `CLAUDE.md` 的 gotcha 清單），公開部署前請留意。

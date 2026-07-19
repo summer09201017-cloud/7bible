@@ -1800,7 +1800,7 @@ function FootprintCard({ readingLog, bibleStructure, onNavigate }) {
         </div>
       )}
       <h3 style={{ margin: '0 0 8px', color: 'var(--subtle-text)', fontSize: 14 }}>全卷熱圖（點格子開啟該章）</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 320, overflow: 'auto', paddingRight: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {bookMap.map((book, bi) => {
           const struct = Array.isArray(bibleStructure) ? bibleStructure.find((b) => b.abbrev === book.localAbbrev) : null;
           const chapCount = struct?.chapters?.length || 0;
@@ -1808,7 +1808,7 @@ function FootprintCard({ readingLog, bibleStructure, onNavigate }) {
           return (
             <div key={book.localAbbrev} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
               <span style={{ fontSize: 10, color: 'var(--muted-text)', width: 52, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{book.names[0]}</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, flex: 1, minWidth: 0 }}>
                 {Array.from({ length: chapCount }, (_, i) => {
                   const chap = i + 1;
                   const count = aggregate.get(`${bi}:${chap}`) || 0;
@@ -1818,7 +1818,7 @@ function FootprintCard({ readingLog, bibleStructure, onNavigate }) {
                       type="button"
                       onClick={() => onNavigate(`${book.names[0]} ${chap}`)}
                       title={`${book.names[0]} ${chap} 章 · ${count} 次`}
-                      style={{ width: 11, height: 11, padding: 0, border: 'none', borderRadius: 2, cursor: 'pointer', background: FOOTPRINT_CELL_COLORS[footprintLevel(count)] }}
+                      style={{ width: 9, height: 9, padding: 0, border: 'none', borderRadius: 2, cursor: 'pointer', background: FOOTPRINT_CELL_COLORS[footprintLevel(count)], flexShrink: 0 }}
                     />
                   );
                 })}

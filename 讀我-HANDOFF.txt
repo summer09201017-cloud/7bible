@@ -1,0 +1,79 @@
+====================================================================
+多譯本聖經查詢 — 交接文件 (HANDOFF)   最後更新：2026-07-19
+給「另一台 PC 的 AI / 接手的人」看的純文字說明
+====================================================================
+
+■ 這是什麼
+  純前端、可離線的聖經查詢 PWA。8 譯本並排對照、章節/關鍵字查詢、
+  串珠交叉引用、讀經足跡追蹤。沒有後端、沒有帳號、沒有資料庫，
+  所有狀態存在使用者裝置的 localStorage。
+  線上：https://7bible.netlify.app/
+  GitHub：summer09201017-cloud/7bible
+
+■ 現在到哪 (2026-07-19)
+  已完成 Wave 3：
+    - 分頁化（查詢頁 / 讀經進度與足跡頁）
+    - 讀經足跡（用了就自動記錄，不用手動打卡）
+    - 串珠交叉引用（openbible.info，CC-BY）
+    - 多項 UX 修正（IME 防誤觸、命中數修正、輕量啟動、toast）
+    - 移除：每日金句、背經模式、個人筆記/收藏/螢光筆
+  健康度：npm run lint 綠、npx vite build 成功、無自動化測試。
+  SW 版本：bible-app-v11。
+  下一步（roadmap 第一列）：關鍵字結果「上下文預覽」。
+
+■ 怎麼跑 / 測 / 建置
+  npm install
+  npm run dev       本機開發 http://localhost:5173
+  npm run build     產出 dist/
+  npm run lint      ESLint（目前全綠）
+  npm run preview   預覽 build http://localhost:4173
+  （沒有 npm test；此專案無自動化測試。驗證靠 lint + build + 手動點。）
+  Windows：雙擊「啟動本機網站.bat」跑 preview 並自動開瀏覽器。
+
+■ 部署 (重要)
+  Netlify 已連 GitHub 自動部署 —— push 到 main 分支就自動 build + 上線，
+  不需要手動 netlify deploy。
+  site id：6d0419a7-7222-4c5e-a9c3-610b0a7cb3a7
+  冒煙驗證線上是不是新版（帶 ?bust= 破 CDN 快取）：
+    curl -s "https://7bible.netlify.app/?bust=$(date +%s)" | grep -o 'assets/index-[^"]*\.js'
+    再抓那個 bundle grep 關鍵字（例如「串珠」「讀經足跡」）確認上去了。
+  改了殼層（sw.js / index.html / 資料結構）務必 bump sw.js 的 CACHE_NAME，
+  否則手機吃舊快取。
+
+■ 本機地雷 (踩過的雷)
+  1. Windows + Node 24 的 vite build 會偶發無聲中斷/exit 127（rmSync 被 OS 砍）。
+     解法：rm -rf dist 後重跑 npx vite build 通常就過；用產物 hash 有沒有變
+     來確認是真的重建，不要只看指令有沒有回傳。
+  2. App.jsx 的 TDZ 陷阱：useEffect 的 deps 若引用「後面才宣告的 const」，
+     整個 app 會 unmount（手機一片綠、桌面常被舊 bundle 蓋住）。
+     宣告順序固定：useState → useRef → 簡單 effect → useCallback → 用到 callback 的 effect。
+  3. 別用 window.alert 當一般提示（已改用 toast，showToast()）。
+
+■ 檔案在哪
+  src/App.jsx        幾乎全部（~2300 行，刻意單體）。所有元件、狀態、樣式(inline S 物件)。
+  src/api.js         fetchBible()（查詢路由 + 搜尋）、loadXref()（串珠懶載入）、VERSIONS。
+  src/bible_books.js bookMap（66 卷）、findLocalAbbrev()。
+  public/data/*.json 8 譯本全文（thiagobodruk 格式），NIV/ 按卷。
+  public/data/structure.json  輕量書卷/章/節數（5KB，啟動用）。gen 見 scripts/gen-structure.mjs
+  public/data/xref/  串珠，每卷一檔。gen 見 scripts/gen-xref.mjs（吃 cross_references.txt 路徑）
+  public/sw.js       離線快取 SW（改殼層要 bump CACHE_NAME）。
+  CLAUDE.md          給 AI 的完整架構 + gotcha 清單（最權威）。
+  README.md          給老師/牧者的使用說明。
+  roadmap.md         已完成 / 待做（CP 值排序）/ 刻意不做。
+  AGENTS.md          給 Codex agent 的版本（內容對齊 CLAUDE.md）。
+
+■ 下一步最該做的一件事
+  關鍵字結果「上下文預覽」：點搜尋結果不要整頁跳走，改成行內展開該章
+  前後 2–3 節（★★★，約半天，資料現成）。細節見 roadmap.md 待做第 1 列。
+
+■ 慣例 (別違反)
+  - 不新增檔案，優先在 App.jsx 適當處加元件（單體是刻意的）。
+  - 不寫敘述性註解、不引入 TypeScript、不加 Tailwind class（維持 inline S 物件）。
+  - 不擅自把 App.jsx 拆檔。
+  - 不擅自加回已移除的功能（每日金句/背經模式/筆記）—— 要先問使用者。
+
+■ 一鍵裝齊 skill（換機後）
+  這個 repo 不依賴任何私有 skill 就能跑（npm install 後即可 dev/build）。
+  若要沿用本系列工作流，另有 skills repo（reading-footprint、static-pwa-ship、
+  manual-deploy-map 等），非本專案必需。
+====================================================================
