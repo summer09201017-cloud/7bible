@@ -336,22 +336,178 @@ function shareToEmail(text) {
   window.location.href = `mailto:?subject=${encodeURIComponent('聖經經文分享')}&body=${encodeURIComponent(text)}`;
 }
 
-function speakText(text) {
+// ====== 朗讀/存語音:hfpc-tts Worker 神經人聲(Workers AI MeloTTS) ======
+const SPEAK_RATE_KEY = 'sevenbible-speak-rate';
+
+function getSpeakRateMul() {
+  let r = 0.82;
+  try {
+    const s = parseFloat(localStorage.getItem(SPEAK_RATE_KEY));
+    if (Number.isFinite(s)) r = s;
+  } catch { /* localStorage 不可用時用預設 */ }
+  return Math.max(0.5, Math.min(1.3, r));
+}
+
+let _currentAudio = null;
+let _speakStopped = false;
+
+// 依句號斷句、打包成 ≤max 字的小塊(即時朗讀用:先播第一塊縮短等待)
+function chunkForTTS(text, max) {
+  const parts = String(text).split(/(?<=[。！？；!?;])\s*/).filter((p) => p.trim());
+  const out = [];
+  let cur = '';
+  for (const p of parts) {
+    if ((cur + p).length > max && cur) { out.push(cur); cur = p; } else { cur += p; }
+    while (cur.length > max) { out.push(cur.slice(0, max)); cur = cur.slice(max); }
+  }
+  if (cur.trim()) out.push(cur);
+  // 純標點/空白塊會讓 TTS 回 44 byte 空 WAV,直接略過
+  return out.filter((c) => /[A-Za-z0-9一-鿿]/.test(c));
+}
+
+async function speakText(text) {
   const clean = stripTags(text).replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
   if (!clean) return;
+  const isLatin = getTextKind(clean) === 'latin';
+  const lang = isLatin ? 'en' : 'zh';
+  stopSpeech();
+  _speakStopped = false;
+  const rate = Math.max(0.5, Math.min(1.3, getSpeakRateMul() * (isLatin ? 0.9 : 1)));
+  const chunks = chunkForTTS(clean, 110);
+  let played = false;
+  showToast('讀取語音中…');
+  for (let i = 0; i < chunks.length; i++) {
+    if (_speakStopped) return;
+    try {
+      const r = await fetch('https://hfpc-tts.summer09201017.workers.dev/tts?lang=' + lang + '&text=' + encodeURIComponent(chunks[i]));
+      if (!r.ok) throw new Error('tts ' + r.status);
+      if (_speakStopped) return;
+      const audio = new Audio(URL.createObjectURL(await r.blob()));
+      try { audio.preservesPitch = true; audio.mozPreservesPitch = true; audio.webkitPreservesPitch = true; } catch { /* 舊瀏覽器沒這屬性 */ }
+      audio.playbackRate = rate;
+      _currentAudio = audio;
+      played = true;
+      await new Promise((resolve) => {
+        audio.onended = () => { try { URL.revokeObjectURL(audio.src); } catch { /* noop */ } resolve(); };
+        audio.onerror = () => resolve();
+        audio.play().catch(() => resolve());
+      });
+    } catch {
+      if (played) return;
+      break;
+    }
+  }
+  if (played || _speakStopped) return;
+  // 人聲服務不可用 → 退回 Web Speech
   if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
     showToast('這個瀏覽器目前不支援朗讀功能');
     return;
   }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(clean.slice(0, 4000));
-  utterance.lang = getTextKind(clean) === 'latin' ? 'en-US' : 'zh-TW';
-  utterance.rate = getTextKind(clean) === 'latin' ? 0.92 : 0.86;
+  utterance.lang = isLatin ? 'en-US' : 'zh-TW';
+  utterance.rate = Math.max(0.4, (isLatin ? 0.92 : 0.86) * getSpeakRateMul() * (isLatin ? 0.72 : 1));
   window.speechSynthesis.speak(utterance);
 }
 
 function stopSpeech() {
+  _speakStopped = true;
   window.speechSynthesis?.cancel();
+  if (_currentAudio) {
+    try { _currentAudio.pause(); } catch { /* noop */ }
+    _currentAudio = null;
+  }
+}
+
+// ====== 存語音檔調速:WSOLA 變速不變調 ======
+// MeloTTS 的 speed 參數被 CF 忽略,所以在瀏覽器端把 WAV 做時間拉伸(音高不變)再存檔。零相依、離線可用。
+function _wsola(input, sr, rate) {
+  // rate<1=放慢(輸出變長)。frame 50ms、50% Hann overlap-add、±10ms 相關搜尋(步距3取樣加速)。
+  const frame = Math.round(sr * 0.05) & ~1;
+  const half = frame >> 1;                 // hopOut
+  const hopIn = Math.max(1, Math.round(half * rate));
+  const seek = Math.round(sr * 0.01);
+  const win = new Float32Array(frame);
+  for (let i = 0; i < frame; i++) win[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (frame - 1)));
+  const outLen = Math.ceil(input.length / rate) + frame * 2;
+  const out = new Float32Array(outLen);
+  const norm = new Float32Array(outLen);
+  let inPos = 0, outPos = 0, prevStart = 0;
+  while (inPos + frame + seek < input.length && outPos + frame < outLen) {
+    let best = 0;
+    if (outPos > 0) {                      // 找和「自然接續」最相關的偏移
+      const refStart = prevStart + half;   // 上一段的自然下一步
+      let bestScore = -Infinity;
+      const lo = Math.max(0, inPos - seek), hi = Math.min(input.length - frame, inPos + seek);
+      for (let cand = lo; cand <= hi; cand += 3) {
+        let s = 0;
+        for (let i = 0; i < half; i += 3) s += input[refStart + i] * input[cand + i];
+        if (s > bestScore) { bestScore = s; best = cand - inPos; }
+      }
+    }
+    const start = inPos + best;
+    for (let i = 0; i < frame; i++) { out[outPos + i] += input[start + i] * win[i]; norm[outPos + i] += win[i]; }
+    prevStart = start;
+    outPos += half;
+    inPos += hopIn;
+  }
+  for (let i = 0; i < outPos + half; i++) if (norm[i] > 1e-4) out[i] /= norm[i];
+  return out.subarray(0, outPos + half);
+}
+
+function _encodeWav(samples, sr) {         // 16-bit PCM 單聲道 WAV
+  const buf = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(buf);
+  const wstr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  wstr(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); wstr(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  wstr(36, 'data'); v.setUint32(40, samples.length * 2, true);
+  for (let i = 0, o = 44; i < samples.length; i++, o += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+// 把選取經文存成語音檔分享(Web Speech 無法錄檔 → hfpc-tts Worker / Workers AI MeloTTS,回 WAV)
+// 2026-07-22:回歸「整段單發 fetch」(對齊 8bible)——切塊逐發會產生純標點空 WAV + 中文模型硬念英文塊=「come come」。
+async function shareVerseAudio(text) {
+  const clean = stripTags(text).replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 900);
+  if (!clean) return;
+  const lang = getTextKind(clean) === 'latin' ? 'en' : 'zh';
+  showToast('產生語音中…約幾秒');
+  try {
+    const r = await fetch('https://hfpc-tts.summer09201017.workers.dev/tts?lang=' + lang + '&text=' + encodeURIComponent(clean));
+    if (!r.ok) throw new Error('tts ' + r.status);
+    let blob = await r.blob();
+    // 依朗讀速度 WSOLA 變速不變調(整段一次,不再切塊串接);調速失敗就存原速檔,不擋下載
+    const rate = Math.max(0.5, Math.min(1.2, getSpeakRateMul() * (lang === 'en' ? 0.72 : 1)));
+    if (Math.abs(rate - 1) >= 0.03) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        try {
+          const dec = await ctx.decodeAudioData(await blob.arrayBuffer());
+          const mono = _wsola(dec.getChannelData(0).slice(0), dec.sampleRate, rate);
+          blob = _encodeWav(mono, dec.sampleRate);
+        } catch { /* 調速失敗 → 原速檔 */ }
+        finally { try { ctx.close(); } catch { /* noop */ } }
+      }
+    }
+    const file = new File([blob], '經文語音.wav', { type: 'audio/wav' });
+    // 手機才試「分享」(直接傳 LINE/訊息);桌機一律直接下載(桌機分享面板常失敗且會亂改副檔名)
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    let shared = false;
+    if (isMobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: '經文語音' }); shared = true; } catch { shared = false; }
+    }
+    if (!shared) {
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = u; a.download = '經文語音.wav'; a.click();
+      setTimeout(() => URL.revokeObjectURL(u), 5000);
+    }
+  } catch { showToast('產生語音失敗，請稍後再試'); }
 }
 
 async function copyToClipboard(text) {
@@ -687,9 +843,11 @@ function FhlLink({ abbrev, chap, sec }) {
   );
 }
 
-function ActionBar({ getSelectedText, getFallbackText, selectedCount, large, isTop, copyFormat, setCopyFormat }) {
+function ActionBar({ getSelectedText, getFallbackText, getSpeakText, selectedCount, large, isTop, copyFormat, setCopyFormat }) {
   const [copied, setCopied] = useState(false);
   const getActionText = () => getSelectedText() || getFallbackText?.() || '';
+  // 朗讀/存語音用「只取單一主譯本」的純文字(沒有就退回一般取字)
+  const getSpeechText = () => (getSpeakText ? getSpeakText() : getActionText());
   const handleCopy = async () => {
     const text = getActionText();
     if (!text) return;
@@ -720,11 +878,27 @@ function ActionBar({ getSelectedText, getFallbackText, selectedCount, large, isT
           {COPY_FORMAT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
       )}
-      <button type="button" onClick={() => speakText(getActionText())} disabled={disabled} className="btn-active-effect" style={{ ...S.smallBtn, ...disabledStyle, padding: large ? '10px 18px' : '6px 12px', fontSize: large ? 15 : 12 }}>
+      {large && (
+        <select
+          defaultValue={(() => { try { return localStorage.getItem(SPEAK_RATE_KEY) || '0.82'; } catch { return '0.82'; } })()}
+          onChange={(e) => { try { localStorage.setItem(SPEAK_RATE_KEY, e.target.value); } catch { /* noop */ } }}
+          title="朗讀速度（英文會再自動放慢一些）"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 700, cursor: 'pointer' }}
+        >
+          <option value="0.62">🐢 很慢</option>
+          <option value="0.82">慢</option>
+          <option value="1">正常</option>
+          <option value="1.2">🐇 稍快</option>
+        </select>
+      )}
+      <button type="button" onClick={() => speakText(getSpeechText())} disabled={disabled} className="btn-active-effect" style={{ ...S.smallBtn, ...disabledStyle, padding: large ? '10px 18px' : '6px 12px', fontSize: large ? 15 : 12 }}>
         朗讀
       </button>
       <button type="button" onClick={stopSpeech} className="btn-active-effect" style={{ ...S.smallBtn, padding: large ? '10px 18px' : '6px 12px', fontSize: large ? 15 : 12 }}>
         停止
+      </button>
+      <button type="button" onClick={() => shareVerseAudio(getSpeechText())} disabled={disabled} className="btn-active-effect" title="把這段經文存成語音檔（可下載或分享給別人聽；只存單一主譯本）" style={{ ...S.smallBtn, ...disabledStyle, padding: large ? '10px 18px' : '6px 12px', fontSize: large ? 15 : 12 }}>
+        存語音
       </button>
       <button type="button" onClick={() => downloadVerseCardFromText(getActionText())} disabled={disabled} className="btn-active-effect" style={{ ...S.smallBtn, ...disabledStyle, padding: large ? '10px 18px' : '6px 12px', fontSize: large ? 15 : 12 }}>
         匯出 PNG
@@ -1261,6 +1435,16 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
     return formatVersesForShare(lines, copyFormat);
   }, [results, bookName, data.chap, copyFormat]);
 
+  // 朗讀/存語音用:只取第一個譯本的純經文(不帶出處與譯本標籤)
+  const getFirstVersionVerseText = useCallback((vNum) => {
+    const vd = results[0]?.record?.find((r) => r.sec === vNum);
+    return vd?.bible_text && vd.bible_text !== '--' ? stripTags(vd.bible_text) : '';
+  }, [results]);
+  const getSpeakText = useCallback(
+    () => (selected.size ? Array.from(selected).sort((a, b) => a - b) : verseNums).map(getFirstVersionVerseText).filter(Boolean).join(' '),
+    [selected, verseNums, getFirstVersionVerseText]
+  );
+
   useEffect(() => {
     const handler = () => {
       const text = getSelectedText();
@@ -1280,7 +1464,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
   return (
     <div style={S.resultCard}>
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
-      <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} getSpeakText={getSpeakText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verseNums.length && verseNums.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -1337,7 +1521,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
         })}
       </div>
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
-      <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} getSpeakText={getSpeakText} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
     </div>
   );
@@ -1432,6 +1616,16 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
     return formatVersesForShare(lines, copyFormat);
   }, [selected, verses, activeResults, copyFormat]);
 
+  // 朗讀/存語音用:只取第一個譯本的純經文(不帶出處與譯本標籤)
+  const getFirstVersionVerseText = useCallback((vo) => {
+    const vd = activeResults[0]?.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
+    return vd?.bible_text && vd.bible_text !== '--' ? stripTags(vd.bible_text) : '';
+  }, [activeResults]);
+  const getSpeakText = useCallback(
+    () => (selected.size ? verses.filter((vo) => selected.has(vo.key)) : filteredVerses).map(getFirstVersionVerseText).filter(Boolean).join(' '),
+    [selected, verses, filteredVerses, getFirstVersionVerseText]
+  );
+
   const getSingleVerseTextForKeyword = useCallback((vo) => {
     const lines = [];
     activeResults.forEach((res) => {
@@ -1523,7 +1717,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
         </select>
         <button type="button" onClick={() => { setResultScope('all'); setBookFilter(''); setVersionFilter('all'); }} style={S.smallBtn}>重置</button>
       </div>
-      <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} getSpeakText={getSpeakText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selectedVisibleCount === filteredVerses.length && filteredVerses.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -1592,7 +1786,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
         </div>
       )}
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
-      <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} getSpeakText={getSpeakText} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
     </div>
   );
 }
