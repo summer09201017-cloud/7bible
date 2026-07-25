@@ -348,6 +348,19 @@ function getSpeakRateMul() {
   return Math.max(0.5, Math.min(1.3, r));
 }
 
+// ====== 朗讀譯本(2026-07-25 使用者點名:朗讀要能選版本、預設 NIV)======
+// 只影響「朗讀 / 存語音」讀哪一個譯本;畫面顯示的譯本清單完全不動。
+const SPEAK_VER_KEY = 'sevenbible-speak-version';
+
+function getSpeakVer() {
+  try { return localStorage.getItem(SPEAK_VER_KEY) || 'niv'; } catch { return 'niv'; }
+}
+// 從「這次畫面上真的有的譯本結果」挑要朗讀的那一份;選的譯本不在畫面上就退回第一個。
+function pickSpeakResult(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  return list.find((r) => r.version === getSpeakVer()) || list[0];
+}
+
 let _currentAudio = null;
 let _speakStopped = false;
 
@@ -843,8 +856,9 @@ function FhlLink({ abbrev, chap, sec }) {
   );
 }
 
-function ActionBar({ getSelectedText, getFallbackText, getSpeakText, selectedCount, large, isTop, copyFormat, setCopyFormat }) {
+function ActionBar({ getSelectedText, getFallbackText, getSpeakText, speakVersions, selectedCount, large, isTop, copyFormat, setCopyFormat }) {
   const [copied, setCopied] = useState(false);
+  const [speakVer, setSpeakVer] = useState(getSpeakVer);
   const getActionText = () => getSelectedText() || getFallbackText?.() || '';
   // 朗讀/存語音用「只取單一主譯本」的純文字(沒有就退回一般取字)
   const getSpeechText = () => (getSpeakText ? getSpeakText() : getActionText());
@@ -876,6 +890,18 @@ function ActionBar({ getSelectedText, getFallbackText, getSpeakText, selectedCou
           style={{ background: 'var(--input-bg)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 700, cursor: 'pointer' }}
         >
           {COPY_FORMAT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
+      )}
+      {large && speakVersions?.length > 1 && (
+        <select
+          value={speakVersions.includes(speakVer) ? speakVer : speakVersions[0]}
+          onChange={(e) => { setSpeakVer(e.target.value); try { localStorage.setItem(SPEAK_VER_KEY, e.target.value); } catch { /* noop */ } }}
+          title="朗讀哪一個譯本（只影響朗讀與存語音，畫面顯示不變）"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 700, cursor: 'pointer' }}
+        >
+          {speakVersions.map((id) => (
+            <option key={id} value={id}>🔊 讀:{VERSIONS.find((v) => v.id === id)?.label || id}</option>
+          ))}
         </select>
       )}
       {large && (
@@ -1435,15 +1461,17 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
     return formatVersesForShare(lines, copyFormat);
   }, [results, bookName, data.chap, copyFormat]);
 
-  // 朗讀/存語音用:只取第一個譯本的純經文(不帶出處與譯本標籤)
+  // 朗讀/存語音用:只取「朗讀譯本」的純經文(不帶出處與譯本標籤)
   const getFirstVersionVerseText = useCallback((vNum) => {
-    const vd = results[0]?.record?.find((r) => r.sec === vNum);
+    const vd = pickSpeakResult(results)?.record?.find((r) => r.sec === vNum);
     return vd?.bible_text && vd.bible_text !== '--' ? stripTags(vd.bible_text) : '';
   }, [results]);
   const getSpeakText = useCallback(
     () => (selected.size ? Array.from(selected).sort((a, b) => a - b) : verseNums).map(getFirstVersionVerseText).filter(Boolean).join(' '),
     [selected, verseNums, getFirstVersionVerseText]
   );
+  // 朗讀譯本下拉的可選清單=這次畫面上真的有的譯本
+  const speakVersions = useMemo(() => results.map((r) => r.version).filter(Boolean), [results]);
 
   useEffect(() => {
     const handler = () => {
@@ -1464,7 +1492,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
   return (
     <div style={S.resultCard}>
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
-      <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} getSpeakText={getSpeakText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} getSpeakText={getSpeakText} speakVersions={speakVersions} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selected.size === verseNums.length && verseNums.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -1521,7 +1549,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
         })}
       </div>
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
-      <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} getSpeakText={getSpeakText} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} getSpeakText={getSpeakText} speakVersions={speakVersions} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
     </div>
   );
@@ -1616,15 +1644,17 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
     return formatVersesForShare(lines, copyFormat);
   }, [selected, verses, activeResults, copyFormat]);
 
-  // 朗讀/存語音用:只取第一個譯本的純經文(不帶出處與譯本標籤)
+  // 朗讀/存語音用:只取「朗讀譯本」的純經文(不帶出處與譯本標籤)
   const getFirstVersionVerseText = useCallback((vo) => {
-    const vd = activeResults[0]?.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
+    const vd = pickSpeakResult(activeResults)?.record?.find((r) => r.localAbbrev === vo.localAbbrev && r.chap === vo.chap && r.sec === vo.sec);
     return vd?.bible_text && vd.bible_text !== '--' ? stripTags(vd.bible_text) : '';
   }, [activeResults]);
   const getSpeakText = useCallback(
     () => (selected.size ? verses.filter((vo) => selected.has(vo.key)) : filteredVerses).map(getFirstVersionVerseText).filter(Boolean).join(' '),
     [selected, verses, filteredVerses, getFirstVersionVerseText]
   );
+  // 朗讀譯本下拉的可選清單=這次畫面上真的有的譯本
+  const speakVersions = useMemo(() => activeResults.map((r) => r.version).filter(Boolean), [activeResults]);
 
   const getSingleVerseTextForKeyword = useCallback((vo) => {
     const lines = [];
@@ -1717,7 +1747,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
         </select>
         <button type="button" onClick={() => { setResultScope('all'); setBookFilter(''); setVersionFilter('all'); }} style={S.smallBtn}>重置</button>
       </div>
-      <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} getSpeakText={getSpeakText} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} getSpeakText={getSpeakText} speakVersions={speakVersions} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <input type="checkbox" checked={selectedVisibleCount === filteredVerses.length && filteredVerses.length > 0} onChange={toggleAll} style={S.checkbox} />
@@ -1786,7 +1816,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
         </div>
       )}
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
-      <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} getSpeakText={getSpeakText} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} getSpeakText={getSpeakText} speakVersions={speakVersions} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
     </div>
   );
 }
@@ -2588,6 +2618,11 @@ export default function App() {
         )}
         <footer style={{ marginTop: 48, textAlign: 'center', color: 'var(--muted-text)', fontSize: 12, paddingBottom: 32 }}>
           資料來源：信望愛 (FHL) 聖經、本機 JSON、8 種譯本離線可用 · 串珠資料：openbible.info (CC-BY)
+          <div style={{ marginTop: 6 }}>
+            <a href="https://hfpc-play-stats.summer09201017.workers.dev/stats" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+              📊 使用統計（同工用）
+            </a>
+          </div>
           <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7 }}>
             build {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}
           </div>
