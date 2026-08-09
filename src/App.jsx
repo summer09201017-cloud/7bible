@@ -360,6 +360,23 @@ function getSpeakVer() {
 function getSpeakRateRaw() { try { return localStorage.getItem(SPEAK_RATE_KEY); } catch { return null; } }
 function setSpeakRateRaw(v) { try { localStorage.setItem(SPEAK_RATE_KEY, v); } catch { /* noop */ } }
 function setSpeakVerRaw(v) { try { localStorage.setItem(SPEAK_VER_KEY, v); } catch { /* noop */ } }
+
+// ====== 備份提醒(0809 B3輕,拍板走輕量版) ======
+// 足跡/歷史只存本機,換手機=歸零;有像樣的資料且 30 天沒匯出就溫和提醒。
+// 兩鍵都是「這台裝置」的狀態,刻意不進備份(table-ux-kit 鐵則①)。
+const LAST_EXPORT_KEY = 'sevenbible-last-export';
+const BACKUP_SNOOZE_KEY = 'sevenbible-backup-snooze';
+function backupNudgeInfo(readingLog, history) {
+  let last = 0, snooze = 0;
+  try { last = parseInt(localStorage.getItem(LAST_EXPORT_KEY) || '0', 10) || 0; } catch { /* noop */ }
+  try { snooze = parseInt(localStorage.getItem(BACKUP_SNOOZE_KEY) || '0', 10) || 0; } catch { /* noop */ }
+  const dayCount = Object.keys(readingLog?.d || {}).length;
+  if (dayCount < 7 && (!history || history.length < 10)) return null; // 資料還少,不吵
+  const now = Date.now();
+  if (snooze && now - snooze < 7 * 864e5) return null;
+  if (last && now - last < 30 * 864e5) return null;
+  return { days: last ? Math.floor((now - last) / 864e5) : null };
+}
 // 從「這次畫面上真的有的譯本結果」挑要朗讀的那一份;選的譯本不在畫面上就退回第一個。
 function pickSpeakResult(list) {
   if (!Array.isArray(list) || !list.length) return null;
@@ -2065,7 +2082,7 @@ function FootprintCard({ readingLog, bibleStructure, onNavigate }) {
   );
 }
 
-function UserLibrary({ history, onRunHistory, onClearHistory, onDeleteHistory, onExport, onImport }) {
+function UserLibrary({ history, onRunHistory, onClearHistory, onDeleteHistory, onExport, onImport, backupNudge, onSnoozeBackup }) {
   const fileInputRef = useRef(null);
 
   const handleFile = (e) => {
@@ -2086,6 +2103,16 @@ function UserLibrary({ history, onRunHistory, onClearHistory, onDeleteHistory, o
 
   return (
     <div style={{ ...S.card, maxWidth: 1180, margin: '0 auto 22px', padding: 18 }}>
+      {backupNudge && (
+        <div style={{ background: 'var(--panel-bg)', border: '1px solid var(--border-strong)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 14, color: 'var(--page-text)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ flex: '1 1 240px' }}>
+            💾 {backupNudge.days === null ? '你的讀經足跡與紀錄還沒備份過' : `距上次備份已 ${backupNudge.days} 天`}
+            ——足跡只存在這台裝置，換手機前記得匯出保存。
+          </span>
+          <button type="button" onClick={onExport} style={S.smallBtn}>立即匯出</button>
+          <button type="button" onClick={onSnoozeBackup} style={S.smallBtn}>7 天後再提醒</button>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <h2 style={{ margin: 0, color: 'var(--heading-text)', fontSize: 18 }}>查詢足跡</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -2486,6 +2513,16 @@ export default function App() {
     handleSearch(item.query, versions, item.options || {});
   }, [handleSearch, versions]);
 
+  const [backupNudgeTick, setBackupNudgeTick] = useState(0);
+  const backupNudge = useMemo(
+    () => backupNudgeInfo(readingLog, history),
+    [readingLog, history, backupNudgeTick], // eslint-disable-line react-hooks/exhaustive-deps -- tick 只為了讓匯出/稍後提醒後重算
+  );
+  const snoozeBackupNudge = useCallback(() => {
+    try { localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now())); } catch { /* noop */ }
+    setBackupNudgeTick((t) => t + 1);
+  }, []);
+
   const exportData = useCallback(() => {
     const payload = {
       app: '多譯本聖經查詢',
@@ -2513,6 +2550,8 @@ export default function App() {
     link.download = `bible-notes-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
+    try { localStorage.setItem(LAST_EXPORT_KEY, String(Date.now())); } catch { /* noop */ }
+    setBackupNudgeTick((t) => t + 1);
   }, [history, readingProgress, readingLog, versions, fontSize, theme, copyFormat, diffEnabled, diffBase, bookmark]);
 
   const importData = useCallback((payload) => {
@@ -2592,6 +2631,8 @@ export default function App() {
               onDeleteHistory={(id) => setHistory((prev) => prev.filter((item) => item.id !== id))}
               onExport={exportData}
               onImport={importData}
+              backupNudge={backupNudge}
+              onSnoozeBackup={snoozeBackupNudge}
             />
             <DailyTools
               bibleStructure={bibleStructure}
