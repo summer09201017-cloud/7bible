@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { fetchBible, fetchLocalVersion, loadXref, VERSIONS } from './api';
 import { bookMap } from './bible_books';
 import { toSpeakable } from './lib/tts-fix.js';
+import { fetchStrongsVerse, lookupStrongs } from './lib/strongs.js';
 
 const VERSION_COLORS = {
   unv: 'var(--version-unv)',
@@ -920,6 +921,124 @@ function CtxPanel({ abbrev, chap, sec, version, onOpenChapter }) {
   );
 }
 
+// 0809 讀6:Strong's 原文編號——點詞看原文字義(FHL 信望愛,行內面板,互動同串珠/前後文)
+function StrongsButton({ open, onToggle }) {
+  return (
+    <button
+      type="button"
+      className="adv-tool"
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggle(); }}
+      title="逐字原文編號與字義(資料來源:信望愛 FHL,需網路)"
+      style={{ marginLeft: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, border: '1px solid var(--border-strong)', background: open ? 'linear-gradient(145deg, #7c3aed, #5b21b6)' : 'var(--input-bg)', color: open ? 'white' : 'var(--heading-text)', borderRadius: 5, cursor: 'pointer', whiteSpace: 'nowrap' }}
+    >
+      原文
+    </button>
+  );
+}
+
+// 字典內文的 #賽 59:9| 式引用轉成可點的站內查詢
+function StrongsDictText({ text, onNavigate }) {
+  const parts = String(text).split(/(#[^#|]{1,15}\|)/g);
+  return (
+    <span style={{ whiteSpace: 'pre-wrap' }}>
+      {parts.map((part, i) => {
+        const m = part.match(/^#([^#|]{1,15})\|$/);
+        if (!m) return <span key={i}>{part}</span>;
+        const ref = m[1].trim();
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => { onNavigate(ref); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            style={{ border: 'none', background: 'none', color: 'var(--link-text)', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 'inherit', fontFamily: 'inherit' }}
+          >
+            {ref}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
+function StrongsPanel({ abbrev, chap, sec, onNavigate }) {
+  const [segs, setSegs] = useState(null);
+  const [active, setActive] = useState(-1);
+  const [dict, setDict] = useState(null);
+  const pickSeqRef = useRef(0);
+
+  useEffect(() => {
+    let alive = true;
+    setSegs(null);
+    setActive(-1);
+    setDict(null);
+    fetchStrongsVerse(getBookName(abbrev), chap, sec)
+      .then((s) => { if (alive) setSegs(s); })
+      .catch(() => { if (alive) setSegs({ error: true }); });
+    return () => { alive = false; };
+  }, [abbrev, chap, sec]);
+
+  const pickWord = async (idx, seg) => {
+    if (idx === active) { setActive(-1); setDict(null); return; }
+    const seq = ++pickSeqRef.current;
+    setActive(idx);
+    setDict('loading');
+    const entries = await Promise.all(seg.nums.map(async (num) => {
+      const key = `${num.lang}${num.n}`;
+      const label = `${num.lang === 'G' ? '希臘文' : '希伯來文'} ${key}${num.parsing ? '(文法)' : ''}`;
+      try {
+        return { key, label, text: await lookupStrongs(num.lang, num.n) };
+      } catch {
+        return { key, label, error: true };
+      }
+    }));
+    if (seq !== pickSeqRef.current) return;
+    setDict({ word: seg.t || '(未譯出的原文字)', entries });
+  };
+
+  return (
+    <div style={{ margin: '0 16px 12px', padding: '10px 12px', border: '1px dashed var(--border-strong)', borderRadius: 10, background: 'var(--panel-bg)' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--subtle-text)', marginBottom: 6 }}>
+        🔤 {getBookName(abbrev)} {chap}:{sec} 原文編號（和合本・資料來源：信望愛 FHL）
+      </div>
+      {segs === null && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>載入原文中…</div>}
+      {segs?.error && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>讀不到原文資料——查原文需要網路連線，請連線後再試。</div>}
+      {Array.isArray(segs) && (
+        <>
+          <div style={{ lineHeight: 2.1, fontSize: 16 }}>
+            {segs.map((seg, idx) => {
+              if (!seg.nums.length) return <span key={idx} style={{ color: 'var(--muted-text)' }}>{seg.t}</span>;
+              const on = idx === active;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => pickWord(idx, seg)}
+                  title={seg.nums.map((n) => n.lang + n.n).join(' ')}
+                  style={{ border: 'none', margin: '0 1px', padding: '0 2px', borderRadius: 4, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit', lineHeight: 'inherit', background: on ? 'var(--keyword-selected-row-bg)' : 'transparent', color: seg.added ? 'var(--muted-text)' : 'var(--page-text)', borderBottom: '2px dotted var(--link-text)', fontWeight: on ? 700 : 400 }}
+                >
+                  {seg.t || '◦'}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted-text)', marginTop: 4 }}>點有底線的詞看原文字義；◦＝原文有、中文未譯出的字。</div>
+        </>
+      )}
+      {dict === 'loading' && <div style={{ marginTop: 8, color: 'var(--muted-text)', fontSize: 14 }}>查字典中…</div>}
+      {dict && dict !== 'loading' && dict.entries.map((en) => (
+        <div key={en.key} style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--input-bg)', border: '1px solid var(--border-soft)' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--heading-text)', marginBottom: 4 }}>
+            「{dict.word}」 {en.label}
+          </div>
+          {en.error
+            ? <div style={{ fontSize: 13, color: 'var(--muted-text)' }}>查無字典條目（或網路中斷）。</div>
+            : <div style={{ fontSize: 13, lineHeight: 1.7, maxHeight: 220, overflowY: 'auto', color: 'var(--page-text)' }}><StrongsDictText text={en.text} onNavigate={onNavigate} /></div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FhlLink({ abbrev, chap, sec }) {
   const url = getFhlCommentaryUrl(abbrev, chap, sec);
   if (!url) return null;
@@ -1485,14 +1604,23 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
   const cols = results.length;
   const bookName = getBookName(data.abbrev);
   const [openXrefs, setOpenXrefs] = useState(new Set());
+  const [openStrongs, setOpenStrongs] = useState(new Set());
 
   useEffect(() => {
     setSelected(new Set());
     setOpenXrefs(new Set());
+    setOpenStrongs(new Set());
   }, [data]);
 
   const toggleXref = (key) => {
     setOpenXrefs((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+  const toggleStrongs = (key) => {
+    setOpenStrongs((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
@@ -1602,6 +1730,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                     </a>
                     <FhlLink abbrev={data.abbrev} chap={data.chap} sec={vNum} />
                     <XrefButton open={openXrefs.has(vNum)} onToggle={() => toggleXref(vNum)} />
+                    <StrongsButton open={openStrongs.has(vNum)} onToggle={() => toggleStrongs(vNum)} />
                     <CopyVerseButton
                       getText={() => {
                         const sel = getSelectedText();
@@ -1629,6 +1758,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                 })}
               </div>
               {openXrefs.has(vNum) && <XrefPanel abbrev={data.abbrev} chap={Number(data.chap)} sec={vNum} onNavigate={onNavigate} />}
+              {openStrongs.has(vNum) && <StrongsPanel abbrev={data.abbrev} chap={Number(data.chap)} sec={vNum} onNavigate={onNavigate} />}
             </div>
           );
         })}
@@ -1683,6 +1813,8 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
 
   const [openCtx, setOpenCtx] = useState(new Set()); // 0809 讀5:展開中的前後文列
 
+  const [openStrongs, setOpenStrongs] = useState(new Set()); // 0809 讀6:展開中的原文列
+
   useEffect(() => {
     setSelected(new Set());
     setDisplayLimit(PAGE_SIZE);
@@ -1691,6 +1823,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
     setVersionFilter('all');
     setOpenXrefs(new Set());
     setOpenCtx(new Set());
+    setOpenStrongs(new Set());
   }, [data]);
 
   const toggleXref = (key) => {
@@ -1702,6 +1835,13 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
   };
   const toggleCtx = (key) => {
     setOpenCtx((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+  const toggleStrongs = (key) => {
+    setOpenStrongs((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
@@ -1869,6 +2009,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
                     <FhlLink abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} />
                     <XrefButton open={openXrefs.has(vo.key)} onToggle={() => toggleXref(vo.key)} />
                     <CtxButton open={openCtx.has(vo.key)} onToggle={() => toggleCtx(vo.key)} />
+                    <StrongsButton open={openStrongs.has(vo.key)} onToggle={() => toggleStrongs(vo.key)} />
                     <CopyVerseButton
                       getText={() => {
                         const sel = getSelectedText();
@@ -1904,6 +2045,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
                   onOpenChapter={() => goToChapter(vo.localAbbrev, vo.chap)}
                 />
               )}
+              {openStrongs.has(vo.key) && <StrongsPanel abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} onNavigate={onNavigate} />}
             </div>
           );
         })}

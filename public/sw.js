@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bible-app-v22';
+const CACHE_NAME = 'bible-app-v23';
 
 const STATIC_ASSETS = [
   '/',
