@@ -1574,7 +1574,7 @@ function FontSizeControl({ fontSize, setFontSize, fixed, topSlot }) {
 }
 
 function EmptyState({ text }) {
-  return <div style={{ textAlign: 'center', color: 'var(--muted-text)', padding: '48px 0', ...S.resultCard }}>{text}</div>;
+  return <div className="result-bleed" style={{ textAlign: 'center', color: 'var(--muted-text)', padding: '48px 0', ...S.resultCard }}>{text}</div>;
 }
 
 function getRecordForVerse(result, chap, sec, chineses) {
@@ -1703,7 +1703,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
   if (verseNums.length === 0) return <EmptyState text="找不到相關經文" />;
 
   return (
-    <div style={S.resultCard}>
+    <div className="result-bleed" style={S.resultCard}>
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
       <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} getSpeakText={getSpeakText} speakVersions={speakVersions} selectedCount={selected.size} large isTop copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <div className="responsive-header" style={{ ...S.tableHeader, display: 'grid', gridTemplateColumns: `52px repeat(${cols}, 1fr)`, gap: 16, padding: '12px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -1945,7 +1945,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
   };
 
   return (
-    <div style={S.resultCard}>
+    <div className="result-bleed" style={S.resultCard}>
       <div style={{ ...S.statsBar, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: '12px 16px' }}>
         <span style={{ color: 'var(--warning-text)', fontSize: 14, fontWeight: 700 }}>關鍵字：<strong>「{keyword}」</strong></span>
         <span style={{ color: 'var(--warning-strong-text)', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆命中（顯示 {filteredVerses.length} / {verses.length} 節）<span style={{ color: 'var(--muted-text)', fontSize: 12, marginLeft: 6, fontWeight: 500 }}>{data.timeMs ? `${data.timeMs}ms` : ''}</span></span>

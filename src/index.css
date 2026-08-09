@@ -253,11 +253,13 @@ input[type="checkbox"]:checked::after {
 
 @media (max-width: 768px) {
   .responsive-header { display: none !important; }
+  /* 0810:結果卡貼齊螢幕邊(抵銷外層容器 0 16px)+收窄兩層內距,每列多顯示約 4 個中文字 */
+  .result-bleed { margin-left: -16px !important; margin-right: -16px !important; }
   .responsive-row {
     display: flex !important;
     flex-direction: column !important;
     gap: 16px !important;
-    padding: 16px !important;
+    padding: 14px 6px !important;
     background: var(--surface-solid) !important;
     color: var(--page-text) !important;
   }
@@ -292,7 +294,7 @@ input[type="checkbox"]:checked::after {
     border: 1px solid var(--border-muted) !important;
     border-radius: 10px !important;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
-    padding: 10px 12px 10px 14px !important;
+    padding: 10px 8px 10px 10px !important;
   }
 }
 
