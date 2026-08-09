@@ -2665,6 +2665,32 @@ function ThemeModeControl({ theme, resolvedTheme, setTheme }) {
   );
 }
 
+// 0810 v26:⬆ 回頂鈕(與 8bible v79 同款——長章×多譯本滑到底,想換書卷要滑很久)
+// 捲超過 1.5 個螢幕才出現;rAF 節流;z-index 800=蓋內容、壓在 Toast(10000) 之下
+function BackToTopButton() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    let ticking = false;
+    const update = () => { ticking = false; setShow(window.scrollY > window.innerHeight * 1.5); };
+    const onScroll = () => { if (!ticking) { ticking = true; window.requestAnimationFrame(update); } };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    update();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  if (!show) return null;
+  return (
+    <button
+      type="button"
+      aria-label="回到頂部"
+      title="回到頂部"
+      onClick={() => { try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { window.scrollTo(0, 0); } }}
+      style={{ position: 'fixed', right: 14, bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))', width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border-strong)', background: 'linear-gradient(145deg, #43a047, #2e7d32)', color: 'white', fontSize: 20, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: 0.85, boxShadow: '0 3px 12px rgba(0,0,0,0.25)', zIndex: 800, WebkitTapHighlightColor: 'transparent' }}
+    >
+      ⬆
+    </button>
+  );
+}
+
 function InstallButton() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installed, setInstalled] = useState(() => window.matchMedia('(display-mode: standalone)').matches);
@@ -3150,6 +3176,7 @@ export default function App() {
         </footer>
       </div>
       <Toast />
+      <BackToTopButton />
     </div>
   );
 }
