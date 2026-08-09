@@ -41,6 +41,9 @@
   否則手機吃舊快取。
 
 ■ 本機地雷 (踩過的雷)
+  0. **本機 dist/ 不可信**（0809 審查抓到 dist 停在 v12 而線上 v16）：Netlify 由 git 觸發
+     自動 build，本機 dist 只是上次手動 build 的殘骸——**絕對不要拖拉 dist 部署**，
+     手滑一次=整站倒退好幾版。dist 已在 .gitignore；驗證線上一律 curl 帶 ?bust=。
   1. Windows + Node 24 的 vite build 會偶發無聲中斷/exit 127（rmSync 被 OS 砍）。
      解法：rm -rf dist 後重跑 npx vite build 通常就過；用產物 hash 有沒有變
      來確認是真的重建，不要只看指令有沒有回傳。

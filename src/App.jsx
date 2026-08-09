@@ -355,6 +355,10 @@ const SPEAK_VER_KEY = 'sevenbible-speak-version';
 function getSpeakVer() {
   try { return localStorage.getItem(SPEAK_VER_KEY) || 'niv'; } catch { return 'niv'; }
 }
+// 0809 審查 A3:朗讀速度/譯本兩鍵接進備份鏈(匯出/匯入)用的 raw 存取
+function getSpeakRateRaw() { try { return localStorage.getItem(SPEAK_RATE_KEY); } catch { return null; } }
+function setSpeakRateRaw(v) { try { localStorage.setItem(SPEAK_RATE_KEY, v); } catch { /* noop */ } }
+function setSpeakVerRaw(v) { try { localStorage.setItem(SPEAK_VER_KEY, v); } catch { /* noop */ } }
 // 從「這次畫面上真的有的譯本結果」挑要朗讀的那一份;選的譯本不在畫面上就退回第一個。
 function pickSpeakResult(list) {
   if (!Array.isArray(list) || !list.length) return null;
@@ -1218,7 +1222,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
         })}
       </div>
       <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted-text)', marginBottom: 12 }}>
-        點選譯本切換顯示, 用 ◀▶ 調整顯示順序
+        點選譯本切換顯示, 用 ◀▶ 調整顯示順序（勾了哪些會自動記住, 下次打開就是你的組合）
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: showAdvanced ? 12 : 0 }}>
@@ -2331,9 +2335,9 @@ export default function App() {
     const urlVersions = vParam
       ? vParam.split(',').map((s) => s.trim()).filter((s) => VERSIONS.find((vv) => vv.id === s))
       : null;
-    if (urlVersions && urlVersions.length > 0) setVersions(urlVersions);
+    // 0809:?v= 深連結只作用「這一次查詢」的顯示,不再 setVersions 永久改掉使用者存好的偏好
     handleSearch(q, urlVersions && urlVersions.length > 0 ? urlVersions : versions, {});
-  }, [handleSearch, setVersions, versions, bookmark]);
+  }, [handleSearch, versions, bookmark]);
 
   const commitReadingLog = useCallback((abbrev, chap) => {
     const bookIndex = bookMap.findIndex((b) => b.localAbbrev === abbrev);
@@ -2384,7 +2388,8 @@ export default function App() {
       : data.keyword;
     if (!q) return;
     params.set('q', q);
-    params.set('v', versions.join(','));
+    // 0809:網址列不再寫 v=(譯本組合)——寫了等於把「當下勾選」封進書籤/分享連結,
+    // 下次冷啟動或別人打開時就把人家存好的譯本偏好永久蓋掉。深連結要指定譯本仍可手寫 ?v=。
     const next = `${window.location.pathname}?${params.toString()}`;
     if (next !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, '', next);
@@ -2470,10 +2475,11 @@ export default function App() {
     return () => document.removeEventListener('keydown', handler);
   }, [data, bibleStructure, handleSearch, versions]);
 
+  // 0809 譯本偏好防蓋:重跑歷史=「用我現在的譯本組合再查一次」——
+  // 舊版會把該筆歷史「當時」的勾選 setVersions 回去,等於每點一筆舊查詢就把使用者現在的預設蓋掉。
   const runHistory = useCallback((item) => {
-    if (Array.isArray(item.versions) && item.versions.length > 0) setVersions(item.versions);
-    handleSearch(item.query, item.versions || versions, item.options || {});
-  }, [handleSearch, setVersions, versions]);
+    handleSearch(item.query, versions, item.options || {});
+  }, [handleSearch, versions]);
 
   const exportData = useCallback(() => {
     const payload = {
@@ -2491,6 +2497,8 @@ export default function App() {
         diffEnabled,
         diffBase,
         bookmark,
+        speakRate: getSpeakRateRaw(),
+        speakVersion: getSpeakVer(),
       },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -2540,6 +2548,9 @@ export default function App() {
       if (typeof settings.diffEnabled === 'boolean') setDiffEnabled(settings.diffEnabled);
       if (typeof settings.diffBase === 'string') setDiffBase(settings.diffBase);
       if (settings.bookmark && typeof settings.bookmark === 'object' && settings.bookmark.label) setBookmark(settings.bookmark);
+      // A3:朗讀偏好還原(raw 寫入;朗讀元件下次讀取時生效)
+      if (typeof settings.speakRate === 'string' && settings.speakRate) setSpeakRateRaw(settings.speakRate);
+      if (typeof settings.speakVersion === 'string' && VERSIONS.some((v) => v.id === settings.speakVersion)) setSpeakVerRaw(settings.speakVersion);
     }
   }, [setHistory, setReadingProgress, setReadingLog, setVersions, setFontSize, setTheme, setCopyFormat, setDiffEnabled, setDiffBase, setBookmark]);
 
@@ -2572,7 +2583,7 @@ export default function App() {
             <UserLibrary
               history={history}
               onRunHistory={runHistory}
-              onClearHistory={() => setHistory([])}
+              onClearHistory={() => { if (window.confirm('確定清空全部查詢歷史?清掉就找不回來了。')) setHistory([]); }}
               onDeleteHistory={(id) => setHistory((prev) => prev.filter((item) => item.id !== id))}
               onExport={exportData}
               onImport={importData}
