@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { fetchBible, loadXref, VERSIONS } from './api';
+import { fetchBible, fetchLocalVersion, loadXref, VERSIONS } from './api';
 import { bookMap } from './bible_books';
 import { toSpeakable } from './lib/tts-fix.js';
 
@@ -873,6 +873,53 @@ function XrefPanel({ abbrev, chap, sec, onNavigate }) {
   );
 }
 
+// 0809 讀5:上下文預覽——關鍵字結果不跳頁,原地展開前後各 2 節(與 8bible 同一互動模式)
+function CtxButton({ open, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggle(); }}
+      title="不跳頁,在這裡展開這節的前後幾節"
+      style={{ marginLeft: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700, borderRadius: 5, border: '1px solid var(--border-strong)', background: open ? 'var(--panel-bg)' : 'var(--input-bg)', color: 'var(--heading-text)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+    >
+      {open ? '⊖ 收合' : '⊕ 前後文'}
+    </button>
+  );
+}
+
+function CtxPanel({ abbrev, chap, sec, version, onOpenChapter }) {
+  const [recs, setRecs] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetchLocalVersion(version || 'unv', abbrev, String(chap), '')
+      .then((res) => { if (alive) setRecs(Array.isArray(res?.record) ? res.record : []); })
+      .catch(() => { if (alive) setRecs([]); });
+    return () => { alive = false; };
+  }, [abbrev, chap, version]);
+  const secN = Number(sec);
+  const ctx = (recs || []).filter((r) => Math.abs(Number(r.sec) - secN) <= 2);
+  const vi = VERSIONS.find((v) => v.id === (version || 'unv'));
+  return (
+    <div style={{ margin: '0 16px 12px', padding: '10px 12px', border: '1px dashed var(--border-strong)', borderRadius: 10, background: 'var(--panel-bg)' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--subtle-text)', marginBottom: 6 }}>
+        📖 {getBookName(abbrev)} {chap} 章・前後文（{vi?.label || version || 'unv'}）
+      </div>
+      {recs === null && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>載入中…</div>}
+      {recs !== null && ctx.length === 0 && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>讀不到前後文，點下面開整章。</div>}
+      {ctx.map((r) => {
+        const hit = Number(r.sec) === secN;
+        return (
+          <div key={r.sec} style={{ display: 'flex', gap: 8, padding: '4px 2px', lineHeight: 1.75, fontSize: 15, color: hit ? 'var(--page-text)' : 'var(--muted-text)', background: hit ? 'var(--keyword-selected-row-bg)' : 'transparent', borderRadius: 6, fontWeight: hit ? 700 : 400 }}>
+            <span style={{ flex: '0 0 auto', minWidth: '1.6em', textAlign: 'right', color: 'var(--link-text)', fontWeight: 700 }}>{r.sec}</span>
+            <span>{r.bible_text}</span>
+          </div>
+        );
+      })}
+      <button type="button" onClick={onOpenChapter} style={{ ...S.smallBtn, marginTop: 6 }}>開啟整章 →</button>
+    </div>
+  );
+}
+
 function FhlLink({ abbrev, chap, sec }) {
   const url = getFhlCommentaryUrl(abbrev, chap, sec);
   if (!url) return null;
@@ -1634,6 +1681,8 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
 
   const [openXrefs, setOpenXrefs] = useState(new Set());
 
+  const [openCtx, setOpenCtx] = useState(new Set()); // 0809 讀5:展開中的前後文列
+
   useEffect(() => {
     setSelected(new Set());
     setDisplayLimit(PAGE_SIZE);
@@ -1641,10 +1690,18 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
     setBookFilter('');
     setVersionFilter('all');
     setOpenXrefs(new Set());
+    setOpenCtx(new Set());
   }, [data]);
 
   const toggleXref = (key) => {
     setOpenXrefs((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+  const toggleCtx = (key) => {
+    setOpenCtx((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
@@ -1811,6 +1868,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
                     </a>
                     <FhlLink abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} />
                     <XrefButton open={openXrefs.has(vo.key)} onToggle={() => toggleXref(vo.key)} />
+                    <CtxButton open={openCtx.has(vo.key)} onToggle={() => toggleCtx(vo.key)} />
                     <CopyVerseButton
                       getText={() => {
                         const sel = getSelectedText();
@@ -1837,6 +1895,15 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
                 })}
               </div>
               {openXrefs.has(vo.key) && <XrefPanel abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} onNavigate={onNavigate} />}
+              {openCtx.has(vo.key) && (
+                <CtxPanel
+                  abbrev={vo.localAbbrev}
+                  chap={vo.chap}
+                  sec={vo.sec}
+                  version={activeResults[0]?.version}
+                  onOpenChapter={() => goToChapter(vo.localAbbrev, vo.chap)}
+                />
+              )}
             </div>
           );
         })}

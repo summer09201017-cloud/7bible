@@ -258,7 +258,7 @@ async function lookupNivVerses(refs) {
   return results;
 }
 
-async function fetchLocalVersion(version, abbrev, chap, sec) {
+export async function fetchLocalVersion(version, abbrev, chap, sec) {
   if (version === 'niv') return fetchNivVersion(abbrev, chap, sec);
 
   try {
