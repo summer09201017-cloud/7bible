@@ -1864,37 +1864,63 @@ function getDayOfYearIndex(date = new Date()) {
   return Math.floor((date - start) / 86400000);
 }
 
-function buildReadingPlan(bibleStructure) {
+// 0809 讀1:一般化成任意天數(1/2/3 年+自訂年數);不帶 totalDays=原本的年曆制 365 天
+function buildReadingPlan(bibleStructure, totalDays = 365) {
   if (!Array.isArray(bibleStructure)) return [];
   const chapters = [];
   bibleStructure.forEach((book) => {
     book.chapters?.forEach((_, index) => chapters.push({ abbrev: book.abbrev, chap: index + 1 }));
   });
   if (chapters.length === 0) return [];
-  const days = Array.from({ length: 365 }, () => []);
+  const days = Array.from({ length: totalDays }, () => []);
   let cursor = 0;
-  for (let day = 0; day < 365; day += 1) {
-    const next = Math.round(((day + 1) * chapters.length) / 365);
+  for (let day = 0; day < totalDays; day += 1) {
+    const next = Math.round(((day + 1) * chapters.length) / totalDays);
     days[day] = chapters.slice(cursor, next);
     cursor = next;
   }
   return days;
 }
 
+function planYearsText(y) { return (y === Math.floor(y) ? y : y.toFixed(1)) + ' 年'; }
+function localYmd(d = new Date()) {
+  // ⚠ 不用 toISOString(UTC 位移會差一天,本系列踩過的日期鍵地雷)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function isValidPlanConfig(p) {
+  return Boolean(p && Number(p.years) > 0 && Number(p.years) <= 20 && /^\d{4}-\d{2}-\d{2}$/.test(p.start || ''));
+}
+
 function formatPlanEntries(entries) {
   return entries.map((entry) => `${getBookName(entry.abbrev)} ${entry.chap}`).join('、');
 }
 
-function DailyReadingCard({ bibleStructure, readingProgress, setReadingProgress, onNavigate }) {
-  const plan = useMemo(() => buildReadingPlan(bibleStructure), [bibleStructure]);
+function DailyReadingCard({ bibleStructure, readingProgress, setReadingProgress, onNavigate, planConfig, setPlanConfig }) {
+  // 0809 讀1:雙制並存——沒設定=原本的年曆制一年計畫(打卡鍵 `${year}-${day}` 原樣不動,零遷移);
+  // 有設定=自訂 1/2/3/N 年計畫,從開始日算天數,打卡鍵用 `plan-${start}-` 前綴隔離(換計畫不污染舊進度)。
+  const [showPicker, setShowPicker] = useState(false);
+  const [customYears, setCustomYears] = useState('');
+  const custom = isValidPlanConfig(planConfig);
+  const totalDays = custom ? Math.max(1, Math.round(Number(planConfig.years) * 365)) : 365;
+  const plan = useMemo(() => buildReadingPlan(bibleStructure, totalDays), [bibleStructure, totalDays]);
   const today = new Date();
   const year = today.getFullYear();
-  const dayIndex = Math.min(getDayOfYearIndex(today), 364);
+  let dayIndex, keyPrefix, planLabel;
+  if (custom) {
+    const startMs = new Date(planConfig.start + 'T00:00:00').getTime();
+    dayIndex = Math.min(Math.max(Math.floor((today.getTime() - startMs) / 86400000), 0), totalDays - 1);
+    keyPrefix = `plan-${planConfig.start}-`;
+    planLabel = `${planYearsText(Number(planConfig.years))}讀完整本聖經(${planConfig.start} 開始)`;
+  } else {
+    dayIndex = Math.min(getDayOfYearIndex(today), 364);
+    keyPrefix = `${year}-`;
+    planLabel = '一年計畫(年曆制,1/1 起算)';
+  }
+  const progressKey = keyPrefix + (dayIndex + 1);
   const entries = plan[dayIndex] || [];
-  const progressKey = `${year}-${dayIndex + 1}`;
   const done = Boolean(readingProgress?.[progressKey]);
-  const completedDays = Object.entries(readingProgress || {}).filter(([key, value]) => key.startsWith(`${year}-`) && value).length;
-  const percent = Math.round((completedDays / 365) * 100);
+  const completedDays = Object.entries(readingProgress || {}).filter(([key, value]) => key.startsWith(keyPrefix) && value).length;
+  const percent = Math.min(100, Math.round((completedDays / totalDays) * 100));
 
   const toggleDone = () => {
     setReadingProgress((prev) => ({ ...(prev || {}), [progressKey]: !done }));
@@ -1903,6 +1929,19 @@ function DailyReadingCard({ bibleStructure, readingProgress, setReadingProgress,
   const openToday = () => {
     const first = entries[0];
     if (first) onNavigate(`${getBookName(first.abbrev)} ${first.chap}`);
+  };
+
+  const startPlan = (yearsRaw) => {
+    const years = Math.round(Number(yearsRaw) * 2) / 2; // 半年為單位
+    if (!(years >= 0.5 && years <= 20)) { showToast('請輸入 0.5 ~ 20 之間的年數'); return; }
+    setPlanConfig({ years, start: localYmd() });
+    setShowPicker(false);
+    showToast(`📅 ${planYearsText(years)}讀經計畫開始!今天是第 1 天`);
+  };
+  const backToCalendarPlan = () => {
+    if (!window.confirm('回到「一年計畫(年曆制)」?自訂計畫的打卡記錄會保留,只是不再顯示。')) return;
+    setPlanConfig(null);
+    setShowPicker(false);
   };
 
   return (
@@ -1914,24 +1953,51 @@ function DailyReadingCard({ bibleStructure, readingProgress, setReadingProgress,
       <div style={{ height: 8, background: 'var(--progress-track)', borderRadius: 999, overflow: 'hidden', marginBottom: 12 }}>
         <div style={{ height: '100%', width: `${percent}%`, background: 'linear-gradient(90deg, #43a047, #facc15)', borderRadius: 999 }} />
       </div>
-      <div style={{ color: 'var(--muted-text)', fontSize: 12, marginBottom: 8 }}>第 {dayIndex + 1} 天 · 已打卡 {completedDays} 天</div>
+      <div style={{ color: 'var(--muted-text)', fontSize: 13, marginBottom: 8 }}>
+        📅 {planLabel} · 第 {dayIndex + 1} / {totalDays} 天 · 已打卡 {completedDays} 天
+      </div>
       <div style={{ color: 'var(--page-text)', fontSize: 16, lineHeight: 1.7, minHeight: 54 }}>
-        {entries.length > 0 ? formatPlanEntries(entries) : '讀經計畫載入中...'}
+        {entries.length > 0 ? formatPlanEntries(entries) : (custom ? '今天不用讀新的章——可以複習,或休息一天 😊' : '讀經計畫載入中...')}
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-        <button type="button" onClick={toggleDone} disabled={entries.length === 0} style={done ? { ...S.btnCopied, padding: '8px 14px', fontSize: 13 } : S.smallBtn}>
+        <button type="button" onClick={toggleDone} disabled={!custom && entries.length === 0} style={done ? { ...S.btnCopied, padding: '8px 14px', fontSize: 13 } : S.smallBtn}>
           {done ? '今日已打卡' : '勾選打卡'}
         </button>
         <button type="button" onClick={openToday} disabled={entries.length === 0} style={S.smallBtn}>開啟今日經文</button>
+        <button type="button" onClick={() => setShowPicker((v) => !v)} style={S.smallBtn}>
+          {showPicker ? '收合' : '⚙ 換計畫'}
+        </button>
       </div>
+      {showPicker && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)' }}>
+          <button type="button" onClick={() => startPlan(1)} style={S.smallBtn}>1 年讀完</button>
+          <button type="button" onClick={() => startPlan(2)} style={S.smallBtn}>2 年讀完</button>
+          <button type="button" onClick={() => startPlan(3)} style={S.smallBtn}>3 年讀完</button>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number" min="0.5" max="20" step="0.5" placeholder="自訂"
+              value={customYears} onChange={(e) => setCustomYears(e.target.value)}
+              style={{ width: 70, padding: 8, border: '1px solid var(--border-strong)', borderRadius: 8, background: 'var(--input-bg)', color: 'var(--heading-text)', fontWeight: 700 }}
+              aria-label="自訂年數"
+            /> 年
+            <button type="button" onClick={() => startPlan(customYears)} style={S.smallBtn}>開始</button>
+          </span>
+          {custom && (
+            <button type="button" onClick={backToCalendarPlan} style={S.smallBtn}>回年曆制一年計畫</button>
+          )}
+          <span style={{ flexBasis: '100%', color: 'var(--muted-text)', fontSize: 12 }}>
+            從按下去那天開始算,每天平均分配全聖經 1189 章;打卡記錄各計畫分開保存。
+          </span>
+        </div>
+      )}
     </section>
   );
 }
 
-function DailyTools({ bibleStructure, readingProgress, setReadingProgress, onNavigate }) {
+function DailyTools({ bibleStructure, readingProgress, setReadingProgress, onNavigate, planConfig, setPlanConfig }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, maxWidth: 1180, margin: '0 auto 22px' }}>
-      <DailyReadingCard bibleStructure={bibleStructure} readingProgress={readingProgress} setReadingProgress={setReadingProgress} onNavigate={onNavigate} />
+      <DailyReadingCard bibleStructure={bibleStructure} readingProgress={readingProgress} setReadingProgress={setReadingProgress} onNavigate={onNavigate} planConfig={planConfig} setPlanConfig={setPlanConfig} />
     </div>
   );
 }
@@ -2278,6 +2344,8 @@ export default function App() {
   const [copyFormat, setCopyFormat] = usePersistentState(LS_KEYS.copyFormat, 'plain');
   const [theme, setTheme] = usePersistentState(LS_KEYS.theme, 'light');
   const [readingProgress, setReadingProgress] = usePersistentState(LS_KEYS.readingProgress, {});
+  // 0809 讀1:自訂讀經計畫設定(null=沿用年曆制一年計畫);資料級,接匯出/匯入
+  const [planConfig, setPlanConfig] = usePersistentState('bible-tool-plan-config-v1', null);
   const [readingLog, setReadingLog] = usePersistentState(LS_KEYS.readingLog, { enabled: true, m: {}, d: {}, recent: {} });
   const [systemDark, setSystemDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches || false);
   const [topBarH, setTopBarH] = useState(96);
@@ -2545,6 +2613,7 @@ export default function App() {
       history,
       readingProgress,
       readingLog,
+      planConfig,
       settings: {
         versions,
         fontSize,
@@ -2566,7 +2635,7 @@ export default function App() {
     URL.revokeObjectURL(url);
     try { localStorage.setItem(LAST_EXPORT_KEY, String(Date.now())); } catch { /* noop */ }
     setBackupNudgeTick((t) => t + 1);
-  }, [history, readingProgress, readingLog, versions, fontSize, theme, copyFormat, diffEnabled, diffBase, bookmark]);
+  }, [history, readingProgress, readingLog, planConfig, versions, fontSize, theme, copyFormat, diffEnabled, diffBase, bookmark]);
 
   const importData = useCallback((payload) => {
     if (!payload || typeof payload !== 'object') throw new Error('Invalid payload');
@@ -2575,6 +2644,9 @@ export default function App() {
     }
     if (payload.readingProgress && typeof payload.readingProgress === 'object') {
       setReadingProgress((prev) => ({ ...prev, ...payload.readingProgress }));
+    }
+    if (isValidPlanConfig(payload.planConfig)) {
+      setPlanConfig({ years: Number(payload.planConfig.years), start: payload.planConfig.start });
     }
     if (payload.readingLog && typeof payload.readingLog === 'object') {
       setReadingLog((prev) => {
@@ -2610,7 +2682,7 @@ export default function App() {
       if (typeof settings.speakRate === 'string' && settings.speakRate) setSpeakRateRaw(settings.speakRate);
       if (typeof settings.speakVersion === 'string' && VERSIONS.some((v) => v.id === settings.speakVersion)) setSpeakVerRaw(settings.speakVersion);
     }
-  }, [setHistory, setReadingProgress, setReadingLog, setVersions, setFontSize, setTheme, setCopyFormat, setDiffEnabled, setDiffBase, setBookmark]);
+  }, [setHistory, setReadingProgress, setReadingLog, setPlanConfig, setVersions, setFontSize, setTheme, setCopyFormat, setDiffEnabled, setDiffBase, setBookmark]);
 
   return (
     <div id="top" data-theme={resolvedTheme} className={simpleMode ? 'simple-mode' : undefined} style={{ ...themeVars, ...S.bg, padding: 0, paddingTop: topBarH, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
@@ -2653,6 +2725,8 @@ export default function App() {
               readingProgress={readingProgress}
               setReadingProgress={setReadingProgress}
               onNavigate={(q) => handleSearch(q, versions, {})}
+              planConfig={planConfig}
+              setPlanConfig={setPlanConfig}
             />
           </>
         )}
