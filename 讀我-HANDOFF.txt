@@ -11,7 +11,7 @@
   GitHub：summer09201017-cloud/7bible
 
 ■ 現在到哪 (2026-08-09 晚：SW **bible-app-v23**；細節見 roadmap.md)
-  - 🔤 **v23 Strong's 原文編號**（DEYI 機；大表「讀6」完工＝📖 閱讀站佇列清空）：
+  - 🔤 **v23 Strong's 原文編號**（DEYI 機；大表「讀6」完工＝📖 閱讀站近期佇列清空）：
     逐節「原文」鈕（章節/關鍵字兩檢視、簡易模式自動隱藏）→ 行內面板帶編號和合本，
     點詞看中文字義（希臘/希伯來/文法碼），字典內 #引用| 可點直跳。
     資料源拍板＝FHL 線上（qb.php strong=1 + sd.php；實測 CORS 通，「風險」不成立；
@@ -22,8 +22,8 @@
     破音字共用檔（v18）、備份提醒（v19）、🧓 簡易模式（v20）、📅 讀經計畫多年版（v21）、
     🔍 上下文預覽（v22）。
   - 拍板記錄：足跡清除鈕**不補**（案結，理由見 roadmap）；備份走輕量提醒不做 Drive。
-  - 待做單一真相＝skills repo 大表「📖 閱讀站佇列」（**已清空**；本站待做見 roadmap：
-    Web Worker 搜尋、語音輸入、關鍵字分佈圖、預快取離線）。
+  - 待做單一真相＝skills repo 大表「📖 閱讀站佇列」（近期單清空，剩排後的讀7 聽經播放器/
+    讀8 語音輸入；本站待做見 roadmap：Web Worker 搜尋、語音輸入、關鍵字分佈圖、預快取離線）。
   - ⚠ 本站 push main **會**自動部署（與 8biblesearch 相反,那站是手動）;
     converge 會跑贏 auto-build——先 `netlify api listSiteDeploys` 確認 state=ready 再驗收斂。
 
