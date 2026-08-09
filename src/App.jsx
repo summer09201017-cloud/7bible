@@ -74,7 +74,7 @@ const S = {
   checkbox: { width: 18, height: 18, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0 },
   statsBar: { background: 'var(--stats-bar-bg)', borderBottom: '1px solid var(--border-soft)' },
   select: { background: 'var(--input-bg)', border: '2px solid var(--border-strong)', borderRadius: '9px', padding: '10px 12px', fontSize: 14, outline: 'none', color: 'var(--heading-text)', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 130 },
-  smallBtn: { border: '1px solid var(--border-strong)', background: 'var(--input-bg)', color: 'var(--heading-text)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  smallBtn: { border: '1px solid var(--border-strong)', background: 'var(--input-bg)', color: 'var(--heading-text)', borderRadius: 8, padding: '6px 10px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }, /* 0809 B1:12→14,長輩看得到 */
   dangerBtn: { border: '1px solid var(--danger-border)', background: 'var(--danger-bg)', color: 'var(--danger-text)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   textarea: { width: '100%', minHeight: 72, resize: 'vertical', border: '1px solid var(--border-strong)', borderRadius: 8, padding: 8, fontSize: 13, lineHeight: 1.5, outline: 'none', background: 'var(--input-bg)', color: 'var(--page-text)' },
 };
@@ -810,6 +810,7 @@ function XrefButton({ open, onToggle }) {
   return (
     <button
       type="button"
+      className="adv-tool"
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
@@ -876,7 +877,7 @@ function FhlLink({ abbrev, chap, sec }) {
   const url = getFhlCommentaryUrl(abbrev, chap, sec);
   if (!url) return null;
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" title="開啟信望愛站註釋資料" style={{ color: 'var(--warning-text)', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid var(--warning-border)', borderRadius: 5, backgroundColor: 'var(--warning-bg)', fontWeight: 700, display: 'inline-block' }}>
+    <a href={url} target="_blank" rel="noopener noreferrer" className="adv-tool" title="開啟信望愛站註釋資料" style={{ color: 'var(--warning-text)', fontSize: 12, textDecoration: 'none', cursor: 'pointer', marginLeft: 8, padding: '2px 6px', border: '1px solid var(--warning-border)', borderRadius: 5, backgroundColor: 'var(--warning-bg)', fontWeight: 700, display: 'inline-block' }}>
       註釋
     </a>
   );
@@ -912,6 +913,7 @@ function ActionBar({ getSelectedText, getFallbackText, getSpeakText, speakVersio
         <select
           value={copyFormat || 'plain'}
           onChange={(e) => setCopyFormat(e.target.value)}
+          className="adv-tool"
           title="複製格式"
           style={{ background: 'var(--input-bg)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: 'var(--heading-text)', fontWeight: 700, cursor: 'pointer' }}
         >
@@ -1039,7 +1041,7 @@ function ChapterNavBar({ data, bibleStructure, onNavigate }) {
   );
 }
 
-function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure, diffEnabled, setDiffEnabled, diffBase, setDiffBase, topBarH = 56 }) {
+function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure, diffEnabled, setDiffEnabled, diffBase, setDiffBase, topBarH = 56, simpleMode, setSimpleMode }) {
   const [query, setQuery] = useState('');
   const [selBook, setSelBook] = useState('');
   const [selChap, setSelChap] = useState('');
@@ -1230,14 +1232,14 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
           return (
             <span key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 0, minWidth: 0 }}>
               {isActive && !isFirst && (
-                <button type="button" onClick={() => moveVersion(v.id, -1)} title="往左移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 2px', fontSize: 10, color: 'var(--heading-text)', fontWeight: 800, flexShrink: 0 }}>◀</button>
+                <button type="button" className="adv-tool" onClick={() => moveVersion(v.id, -1)} title="往左移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 2px', fontSize: 10, color: 'var(--heading-text)', fontWeight: 800, flexShrink: 0 }}>◀</button>
               )}
               <label style={{ ...(isActive ? S.pillActive : S.pillInactive), padding: '4px 6px', fontSize: 12, flex: 1, minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 <input type="checkbox" style={{ display: 'none' }} checked={isActive} onChange={() => handleVersionToggle(v.id)} />
                 {v.label}
               </label>
               {isActive && !isLast && (
-                <button type="button" onClick={() => moveVersion(v.id, 1)} title="往右移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 2px', fontSize: 10, color: 'var(--heading-text)', fontWeight: 800, flexShrink: 0 }}>▶</button>
+                <button type="button" className="adv-tool" onClick={() => moveVersion(v.id, 1)} title="往右移" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 2px', fontSize: 10, color: 'var(--heading-text)', fontWeight: 800, flexShrink: 0 }}>▶</button>
               )}
             </span>
           );
@@ -1248,16 +1250,26 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: showAdvanced ? 12 : 0 }}>
+        <button
+          type="button"
+          onClick={() => { setSimpleMode(!simpleMode); if (!simpleMode) setShowAdvanced(false); }}
+          style={S.smallBtn}
+          title="簡易模式:收起進階搜尋/差異高亮/串珠/複製格式等查經工具,畫面只留查詢與讀經"
+        >
+          {simpleMode ? '↩ 回完整模式' : '🧓 簡易模式'}
+        </button>
+        {!simpleMode && (
         <button type="button" onClick={() => setShowAdvanced((v) => !v)} style={S.smallBtn}>
           {showAdvanced ? '收合進階搜尋' : '進階搜尋'}
         </button>
-        {typeof diffEnabled === 'boolean' && (
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--page-text)', fontWeight: 700, cursor: 'pointer' }}>
+        )}
+        {typeof diffEnabled === 'boolean' && !simpleMode && (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--page-text)', fontWeight: 700, cursor: 'pointer' }}>
             <input type="checkbox" checked={diffEnabled} onChange={(e) => setDiffEnabled(e.target.checked)} />
             差異高亮
           </label>
         )}
-        {diffEnabled && versions.length >= 2 && (() => {
+        {diffEnabled && !simpleMode && versions.length >= 2 && (() => {
           const selectedLangs = new Set(versions.map((vid) => VERSIONS.find((v) => v.id === vid)?.lang).filter(Boolean));
           const baseLang = diffBase ? VERSIONS.find((v) => v.id === diffBase)?.lang : null;
           const skippedCount = baseLang ? versions.filter((vid) => {
@@ -2165,8 +2177,8 @@ function ViewTabs({ view, setView, big }) {
               background: active ? 'linear-gradient(145deg, #43a047, #2e7d32)' : 'transparent',
               color: active ? 'white' : 'var(--heading-text)',
               borderRadius: 8,
-              padding: big ? '5px 14px' : '6px 12px',
-              fontSize: big ? 13 : 12,
+              padding: big ? '6px 16px' : '7px 13px',
+              fontSize: big ? 15 : 14, /* 0809 B1:12/13→14/15 */
               fontWeight: 800,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
@@ -2254,6 +2266,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [versions, setVersions] = usePersistentState(LS_KEYS.versions, ['unv', 'niv', 'esv', 'ncv', 'lzz']);
+  // 🧓 簡易模式(0809 B1):收起查經工具(進階搜尋/差異高亮/串珠/註釋/複製格式/排序箭頭)。裝置層偏好,刻意不進備份。
+  const [simpleMode, setSimpleMode] = usePersistentState('sevenbible-simple-mode', false);
   const [fontSize, setFontSize] = usePersistentState(LS_KEYS.fontSize, 15);
   const [diffEnabled, setDiffEnabled] = usePersistentState(LS_KEYS.diffEnabled, true);
   const [diffBase, setDiffBase] = usePersistentState(LS_KEYS.diffBase, '');
@@ -2599,9 +2613,9 @@ export default function App() {
   }, [setHistory, setReadingProgress, setReadingLog, setVersions, setFontSize, setTheme, setCopyFormat, setDiffEnabled, setDiffBase, setBookmark]);
 
   return (
-    <div id="top" data-theme={resolvedTheme} style={{ ...themeVars, ...S.bg, padding: 0, paddingTop: topBarH, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+    <div id="top" data-theme={resolvedTheme} className={simpleMode ? 'simple-mode' : undefined} style={{ ...themeVars, ...S.bg, padding: 0, paddingTop: topBarH, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 16px' }}>
-        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} diffBase={diffBase} setDiffBase={setDiffBase} topBarH={topBarH} />
+        <SearchBar onSearch={handleSearch} isLoading={loading} versions={versions} setVersions={setVersions} bibleStructure={bibleStructure} diffEnabled={diffEnabled} setDiffEnabled={setDiffEnabled} diffBase={diffBase} setDiffBase={setDiffBase} topBarH={topBarH} simpleMode={simpleMode} setSimpleMode={setSimpleMode} />
         <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} fixed topSlot={<ViewTabs view={view} setView={setView} big />} />
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
           <InstallButton />

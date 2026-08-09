@@ -296,3 +296,6 @@ input[type="checkbox"]:checked::after {
   }
 }
 
+
+/* 🧓 簡易模式(0809 B1):收起查經工具——串珠/註釋/複製格式/譯本排序箭頭(進階搜尋與差異高亮在 JSX 條件渲染) */
+.simple-mode .adv-tool { display: none !important; }
