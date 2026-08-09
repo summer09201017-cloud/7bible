@@ -6,7 +6,7 @@ Guidance for future Claude Code agents working in this repo.
 
 - **上線中**：https://7bible.netlify.app/ ，GitHub repo `summer09201017-cloud/7bible`，Netlify **已連 GitHub 自動部署**（push `main` 即上線；site id `6d0419a7-7222-4c5e-a9c3-610b0a7cb3a7`）。不需手動 `netlify deploy`。
 - **已完成到 Wave 3**：分頁化（查詢 / 讀經進度與足跡）、讀經足跡、串珠交叉引用、多項 UX 修正；同時**移除**每日金句、背經模式、個人筆記/收藏/螢光筆（見下方「Removed features」）。
-- **健康度**：`npm run lint` 綠、`npx vite build` 成功、無自動化測試（沒有 `npm test`）。SW 版本 `bible-app-v27`(0810)。
+- **健康度**：`npm run lint` 綠、`npx vite build` 成功、無自動化測試（沒有 `npm test`）。SW 版本 `bible-app-v28`(0810)。
 - **下一步（roadmap 第一列）**：搜尋移到 Web Worker + 簡單索引（根治多譯本全書掃描卡頓）。
 
 ## Project

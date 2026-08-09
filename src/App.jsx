@@ -1168,8 +1168,8 @@ function CommentaryModal({ abbrev, chap, sec, fontSize, onNavigate, onClose }) {
   const externalUrl = `https://bible.fhl.net/new/com.php?book=3&engs=${encodeURIComponent(cur.engs || '')}&chap=${cur.chap}&sec=${cur.sec}&m=0`;
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 10 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--surface-solid)', borderRadius: 14, border: '1px solid var(--border-strong)', boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10000, display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(900px, 100vw)', height: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--surface-solid)', border: '1px solid var(--border-strong)', boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border-soft)' }}>
           <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--heading-text)', marginRight: 'auto' }}>📖 信望愛站註釋</span>
           <a href={externalUrl} target="_blank" rel="noopener noreferrer" style={{ ...S.smallBtn, textDecoration: 'none', padding: '6px 12px' }}>新分頁開啟</a>
