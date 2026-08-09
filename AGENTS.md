@@ -6,7 +6,7 @@ Guidance for future Codex agents working in this repo.
 
 - **上線中**：https://7bible.netlify.app/ ，GitHub repo `summer09201017-cloud/7bible`，Netlify **已連 GitHub 自動部署**（push `main` 即上線；site id `6d0419a7-7222-4c5e-a9c3-610b0a7cb3a7`）。不需手動 `netlify deploy`。
 - **已完成到 Wave 3**：分頁化（查詢 / 讀經進度與足跡）、讀經足跡、串珠交叉引用、多項 UX 修正；同時**移除**每日金句、背經模式、個人筆記/收藏/螢光筆（見下方「Removed features」）。
-- **健康度**：`npm run lint` 綠、`npx vite build` 成功、無自動化測試（沒有 `npm test`）。SW 版本 `bible-app-v26`(0810)。
+- **健康度**：`npm run lint` 綠、`npx vite build` 成功、無自動化測試（沒有 `npm test`）。SW 版本 `bible-app-v27`(0810)。
 - **下一步（roadmap 第一列）**：搜尋移到 Web Worker + 簡單索引（根治多譯本全書掃描卡頓）。
 
 ## Project
@@ -35,7 +35,7 @@ npm run preview   # http://localhost:4173
 
 | File | What it owns |
 |---|---|
-| `src/App.jsx` | **Everything** — App state, all components (SearchBar, VerseViewer, KeywordViewer, ActionBar, ChapterNavBar, ViewTabs, FootprintCard, UserLibrary, FontSizeControl, InstallButton, CopyVerseButton, VerseText, XrefButton/XrefPanel, StrongsButton/StrongsPanel, CommentButton/CommentaryPanel, Toast). ~2300 lines, monolithic on purpose for now. |
+| `src/App.jsx` | **Everything** — App state, all components (SearchBar, VerseViewer, KeywordViewer, ActionBar, ChapterNavBar, ViewTabs, FootprintCard, UserLibrary, FontSizeControl, InstallButton, CopyVerseButton, VerseText, XrefButton/XrefPanel, StrongsButton/StrongsPanel, CommentButton/CommentaryModal, Toast). ~2300 lines, monolithic on purpose for now. |
 | `src/api.js` | `fetchBible(query, versions, options)` — reference vs keyword routing, NIV per-book lazy load, search matcher (AND/OR/exact/exclude/scope). `loadXref(localAbbrev)` — 串珠 per-book lazy load. Exports `VERSIONS` (id, label, lang). |
 | `src/bible_books.js` | `bookMap` (66 entries: `{ engs, fhlEngs, localAbbrev, names, nivFile }`). `findLocalAbbrev(input)` resolves any alias. |
 | `src/localSearch.js` | **Legacy / unused by main flow**. Don't extend. |

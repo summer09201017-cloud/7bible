@@ -1058,8 +1058,9 @@ function CommentButton({ open, onToggle }) {
 }
 
 // com_text 的一段:text 直出、#參照| 轉站內查詢、SNG/SNH 轉原文字義展開鈕
-function ComBlockText({ text, abbrev, onNavigate, onPickSn, openSnKey }) {
-  const tokens = useMemo(() => tokenizeComText(text), [text]);
+// defaultLang:裸 SN 編號(不帶 G/H,羅馬書實例)用書卷新舊約推語言
+function ComBlockText({ text, abbrev, defaultLang, onNavigate, onPickSn, openSnKey }) {
+  const tokens = useMemo(() => tokenizeComText(text, defaultLang), [text, defaultLang]);
   return (
     <>
       {tokens.map((tk, i) => {
@@ -1086,13 +1087,23 @@ function ComBlockText({ text, abbrev, onNavigate, onPickSn, openSnKey }) {
   );
 }
 
-function CommentaryPanel({ abbrev, chap, sec, fontSize, onNavigate }) {
+// 0810 v27:使用者拍板改「獨立彈窗」(與 8bible 同款),不佔經文版面;含「新分頁開啟」逃生口
+function CommentaryModal({ abbrev, chap, sec, fontSize, onNavigate, onClose }) {
   const [cur, setCur] = useState({ engs: FHL_ENGS_BY_LOCAL[abbrev], chap: Number(chap), sec: Number(sec) });
   const [data, setData] = useState(null);
   const [openSn, setOpenSn] = useState(null); // { blockKey, lang, n, label, text|null, error }
   const seqRef = useRef(0);
+  const defaultLang = bookMap.findIndex((b) => b.localAbbrev === abbrev) <= 38 ? 'H' : 'G';
 
   useEffect(() => { setCur({ engs: FHL_ENGS_BY_LOCAL[abbrev], chap: Number(chap), sec: Number(sec) }); }, [abbrev, chap, sec]);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prevOverflow; document.removeEventListener('keydown', onKey); };
+  }, [onClose]);
 
   useEffect(() => {
     if (!cur.engs) { setData({ error: true }); return undefined; }
@@ -1127,6 +1138,7 @@ function CommentaryPanel({ abbrev, chap, sec, fontSize, onNavigate }) {
   };
 
   const fs = fontSize || 15;
+  const go = (q) => { onClose(); onNavigate(q); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const navBtn = { ...S.smallBtn, borderRadius: 999, padding: '6px 14px' };
   const renderNav = (info, arrow) => {
     if (!info || !info.engs) return null;
@@ -1146,50 +1158,55 @@ function CommentaryPanel({ abbrev, chap, sec, fontSize, onNavigate }) {
         {openSn.error && <div style={{ fontSize: 13, color: 'var(--muted-text)' }}>查無字典條目（或網路中斷）。</div>}
         {openSn.text !== undefined && !openSn.error && (
           <div style={{ fontSize: 13, lineHeight: 1.7, maxHeight: 220, overflowY: 'auto', whiteSpace: 'pre-wrap', color: 'var(--page-text)' }}>
-            <ComBlockText text={openSn.text} abbrev={abbrev} onNavigate={onNavigate} onPickSn={(tk) => pickSn(blockKey, tk)} openSnKey={`${openSn.lang}${openSn.n}`} />
+            <ComBlockText text={openSn.text} abbrev={abbrev} defaultLang={openSn.lang} onNavigate={go} onPickSn={(tk) => pickSn(blockKey, tk)} openSnKey={`${openSn.lang}${openSn.n}`} />
           </div>
         )}
       </div>
     );
   };
 
+  const externalUrl = `https://bible.fhl.net/new/com.php?book=3&engs=${encodeURIComponent(cur.engs || '')}&chap=${cur.chap}&sec=${cur.sec}&m=0`;
+
   return (
-    <div style={{ margin: '0 16px 12px', padding: '10px 12px', border: '1px dashed var(--warning-border)', borderRadius: 10, background: 'var(--panel-bg)' }}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--subtle-text)', marginBottom: 6 }}>
-        📖 信望愛站註釋（就地閱讀，字級跟隨上方滑桿）
-      </div>
-      {data === null && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>註釋載入中…（需要連線）</div>}
-      {data?.error && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>讀不到註釋——請連線後再試，或點下方「在信望愛開啟」。</div>}
-      {data && !data.error && (
-        <>
-          {data.records.length === 0 && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>這一段沒有註釋資料，可用下方「上一段 / 下一段」換段閱讀。</div>}
-          {data.records.map((rec, ri) => (
-            <div key={ri}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--warning-text)', margin: '6px 0 8px' }}>{rec.title}（{rec.bookName}）</div>
-              {rec.blocks.map((blk, bi) => {
-                const blockKey = `${ri}:${bi}`;
-                return (
-                  <div key={bi}>
-                    <div style={{ paddingLeft: `${Math.min(5, blk.indent * 0.35).toFixed(1)}em`, fontSize: fs, lineHeight: 1.85, color: 'var(--page-text)', marginBottom: 7 }}>
-                      <ComBlockText text={blk.text} abbrev={abbrev} onNavigate={onNavigate} onPickSn={(tk) => pickSn(blockKey, tk)} openSnKey={openSn && openSn.blockKey === blockKey ? `${openSn.lang}${openSn.n}` : null} />
-                    </div>
-                    {snCard(blockKey)}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            {renderNav(data.prev, 'prev')}
-            {renderNav(data.next, 'next')}
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 10 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--surface-solid)', borderRadius: 14, border: '1px solid var(--border-strong)', boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border-soft)' }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--heading-text)', marginRight: 'auto' }}>📖 信望愛站註釋</span>
+          <a href={externalUrl} target="_blank" rel="noopener noreferrer" style={{ ...S.smallBtn, textDecoration: 'none', padding: '6px 12px' }}>新分頁開啟</a>
+          <button type="button" onClick={onClose} style={{ ...S.smallBtn, padding: '6px 12px', background: 'linear-gradient(145deg, #d97706, #92400e)', color: 'white', border: 'none' }}>關閉</button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '10px 14px' }}>
+          {data === null && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>註釋載入中…（需要連線）</div>}
+          {data?.error && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>讀不到註釋——請連線後再試，或點上方「新分頁開啟」。</div>}
+          {data && !data.error && (
+            <>
+              {data.records.length === 0 && <div style={{ color: 'var(--muted-text)', fontSize: 14 }}>這一段沒有註釋資料，可用下方「上一段 / 下一段」換段閱讀。</div>}
+              {data.records.map((rec, ri) => (
+                <div key={ri}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--warning-text)', margin: '6px 0 8px' }}>{rec.title}（{rec.bookName}）</div>
+                  {rec.blocks.map((blk, bi) => {
+                    const blockKey = `${ri}:${bi}`;
+                    return (
+                      <div key={bi}>
+                        <div style={{ paddingLeft: `${Math.min(5, blk.indent * 0.35).toFixed(1)}em`, fontSize: fs, lineHeight: 1.85, color: 'var(--page-text)', marginBottom: 7 }}>
+                          <ComBlockText text={blk.text} abbrev={abbrev} defaultLang={defaultLang} onNavigate={go} onPickSn={(tk) => pickSn(blockKey, tk)} openSnKey={openSn && openSn.blockKey === blockKey ? `${openSn.lang}${openSn.n}` : null} />
+                        </div>
+                        {snCard(blockKey)}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                {renderNav(data.prev, 'prev')}
+                {renderNav(data.next, 'next')}
+              </div>
+            </>
+          )}
+          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border-soft)', fontSize: 12, color: 'var(--muted-text)' }}>
+            資料來源：信望愛聖經網站（CBOL 計畫），版權屬原站所有；字級跟隨上方滑桿。
           </div>
-        </>
-      )}
-      <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border-soft)', fontSize: 12, color: 'var(--muted-text)' }}>
-        資料來源：信望愛聖經網站（CBOL 計畫），版權屬原站所有。
-        {getFhlCommentaryUrl(abbrev, chap, sec) && (
-          <a href={getFhlCommentaryUrl(abbrev, chap, sec)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--link-text)', marginLeft: 6 }}>在信望愛開啟 →</a>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -1751,13 +1768,13 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
   const bookName = getBookName(data.abbrev);
   const [openXrefs, setOpenXrefs] = useState(new Set());
   const [openStrongs, setOpenStrongs] = useState(new Set());
-  const [openComments, setOpenComments] = useState(new Set());
+  const [commentFor, setCommentFor] = useState(null); // v27:註釋改彈窗,單一開啟
 
   useEffect(() => {
     setSelected(new Set());
     setOpenXrefs(new Set());
     setOpenStrongs(new Set());
-    setOpenComments(new Set());
+    setCommentFor(null);
   }, [data]);
 
   const toggleXref = (key) => {
@@ -1774,14 +1791,6 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
       return next;
     });
   };
-  const toggleComment = (key) => {
-    setOpenComments((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
-
   const toggleVerse = (n) => {
     const next = new Set(selected);
     next.has(n) ? next.delete(n) : next.add(n);
@@ -1883,7 +1892,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                     <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="mobile-verse-label" style={{ color: 'var(--link-text)', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
                       第 {vNum} 節
                     </a>
-                    <CommentButton open={openComments.has(vNum)} onToggle={() => toggleComment(vNum)} />
+                    <CommentButton open={commentFor === vNum} onToggle={() => setCommentFor(commentFor === vNum ? null : vNum)} />
                     <XrefButton open={openXrefs.has(vNum)} onToggle={() => toggleXref(vNum)} />
                     <StrongsButton open={openStrongs.has(vNum)} onToggle={() => toggleStrongs(vNum)} />
                     <CopyVerseButton
@@ -1914,7 +1923,6 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
               </div>
               {openXrefs.has(vNum) && <XrefPanel abbrev={data.abbrev} chap={Number(data.chap)} sec={vNum} onNavigate={onNavigate} />}
               {openStrongs.has(vNum) && <StrongsPanel abbrev={data.abbrev} chap={Number(data.chap)} sec={vNum} onNavigate={onNavigate} />}
-              {openComments.has(vNum) && <CommentaryPanel abbrev={data.abbrev} chap={Number(data.chap)} sec={vNum} fontSize={fontSize} onNavigate={onNavigate} />}
             </div>
           );
         })}
@@ -1922,6 +1930,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
       <ActionBar getSelectedText={getSelectedText} getFallbackText={getAllText} getSpeakText={getSpeakText} speakVersions={speakVersions} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
       <ChapterNavBar data={data} bibleStructure={bibleStructure} onNavigate={onNavigate} />
+      {commentFor != null && <CommentaryModal abbrev={data.abbrev} chap={Number(data.chap)} sec={commentFor} fontSize={fontSize} onNavigate={onNavigate} onClose={() => setCommentFor(null)} />}
     </div>
   );
 }
@@ -1971,7 +1980,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
 
   const [openStrongs, setOpenStrongs] = useState(new Set()); // 0809 讀6:展開中的原文列
 
-  const [openComments, setOpenComments] = useState(new Set()); // 0810 v25:展開中的註釋列
+  const [commentFor, setCommentFor] = useState(null); // v27:註釋改彈窗,單一開啟(存 vo)
 
   useEffect(() => {
     setSelected(new Set());
@@ -1982,7 +1991,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
     setOpenXrefs(new Set());
     setOpenCtx(new Set());
     setOpenStrongs(new Set());
-    setOpenComments(new Set());
+    setCommentFor(null);
   }, [data]);
 
   const toggleXref = (key) => {
@@ -2006,14 +2015,6 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
       return next;
     });
   };
-  const toggleComment = (key) => {
-    setOpenComments((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
-
   const visibleVerses = useMemo(() => filteredVerses.slice(0, displayLimit), [filteredVerses, displayLimit]);
   const hasMore = filteredVerses.length > displayLimit;
 
@@ -2172,7 +2173,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
                     <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="mobile-verse-label" style={{ color: 'var(--link-text)', textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
                       {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
                     </a>
-                    <CommentButton open={openComments.has(vo.key)} onToggle={() => toggleComment(vo.key)} />
+                    <CommentButton open={commentFor?.key === vo.key} onToggle={() => setCommentFor(commentFor?.key === vo.key ? null : vo)} />
                     <XrefButton open={openXrefs.has(vo.key)} onToggle={() => toggleXref(vo.key)} />
                     <CtxButton open={openCtx.has(vo.key)} onToggle={() => toggleCtx(vo.key)} />
                     <StrongsButton open={openStrongs.has(vo.key)} onToggle={() => toggleStrongs(vo.key)} />
@@ -2212,7 +2213,6 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
                 />
               )}
               {openStrongs.has(vo.key) && <StrongsPanel abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} onNavigate={onNavigate} />}
-              {openComments.has(vo.key) && <CommentaryPanel abbrev={vo.localAbbrev} chap={vo.chap} sec={vo.sec} fontSize={fontSize} onNavigate={onNavigate} />}
             </div>
           );
         })}
@@ -2231,6 +2231,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
       )}
       <FontSizeControl fontSize={fontSize} setFontSize={setFontSize} />
       <ActionBar getSelectedText={getSelectedText} getFallbackText={getFilteredText} getSpeakText={getSpeakText} speakVersions={speakVersions} selectedCount={selected.size} large copyFormat={copyFormat} setCopyFormat={setCopyFormat} />
+      {commentFor && <CommentaryModal abbrev={commentFor.localAbbrev} chap={commentFor.chap} sec={commentFor.sec} fontSize={fontSize} onNavigate={onNavigate} onClose={() => setCommentFor(null)} />}
     </div>
   );
 }

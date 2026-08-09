@@ -37,9 +37,11 @@ export function reflowComText(txt) {
 //   { t:'text', v }                     — 純文字
 //   { t:'ref',  v:'創 36:39' }          — #參照|(可能無書卷=當前書卷,site 層自己補)
 //   { t:'sn',   lang:'G'|'H', n:'25', label:'SG 25' } — 原文編號
-export function tokenizeComText(text) {
+// ⚠ 0810 全書掃描發現兩種變體(哀歌 `SNH 57` 帶空格、羅馬書裸 `SN00846` 不帶字母)——
+//   regex 放寬:字母可省(用 defaultLang=書卷新舊約推)、字母與數字間容許空白。
+export function tokenizeComText(text, defaultLang = 'G') {
   const tokens = [];
-  const re = /#([^#|\r\n]{1,50})\||SN([GH])0*(\d{1,6})/g;
+  const re = /#([^#|\r\n]{1,50})\||SN([GH])?[ \t\u3000]*0*(\d{1,6})/g;
   const src = String(text || '');
   let i = 0, m;
   while ((m = re.exec(src)) !== null) {
@@ -47,7 +49,8 @@ export function tokenizeComText(text) {
     if (m[1] !== undefined) {
       tokens.push({ t: 'ref', v: m[1].trim() });
     } else {
-      tokens.push({ t: 'sn', lang: m[2], n: m[3], label: (m[2] === 'G' ? 'SG ' : 'SH ') + m[3] });
+      const lang = m[2] || defaultLang;
+      tokens.push({ t: 'sn', lang, n: m[3], label: (lang === 'G' ? 'SG ' : 'SH ') + m[3] });
     }
     i = re.lastIndex;
   }
