@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { fetchBible, loadXref, VERSIONS } from './api';
 import { bookMap } from './bible_books';
+import { toSpeakable } from './lib/tts-fix.js';
 
 const VERSION_COLORS = {
   unv: 'var(--version-unv)',
@@ -390,7 +391,9 @@ async function speakText(text) {
   stopSpeech();
   _speakStopped = false;
   const rate = Math.max(0.5, Math.min(1.3, getSpeakRateMul() * (isLatin ? 0.9 : 1)));
-  const chunks = chunkForTTS(clean, 110);
+  // 破音字同音替換(共用 core tts-fix.js):只影響唸的字串,畫面經文不動
+  const speakSrc = isLatin ? clean : toSpeakable(clean);
+  const chunks = chunkForTTS(speakSrc, 110);
   let played = false;
   showToast('讀取語音中…');
   for (let i = 0; i < chunks.length; i++) {
@@ -493,9 +496,11 @@ async function shareVerseAudio(text) {
   const clean = stripTags(text).replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 900);
   if (!clean) return;
   const lang = getTextKind(clean) === 'latin' ? 'en' : 'zh';
+  // 破音字同音替換(共用 core tts-fix.js):只影響唸的字串,檔名/畫面不動
+  const speakSrc = lang === 'zh' ? toSpeakable(clean) : clean;
   showToast('產生語音中…約幾秒');
   try {
-    const r = await fetch('https://hfpc-tts.summer09201017.workers.dev/tts?lang=' + lang + '&text=' + encodeURIComponent(clean));
+    const r = await fetch('https://hfpc-tts.summer09201017.workers.dev/tts?lang=' + lang + '&text=' + encodeURIComponent(speakSrc));
     if (!r.ok) throw new Error('tts ' + r.status);
     let blob = await r.blob();
     // 依朗讀速度 WSOLA 變速不變調(整段一次,不再切塊串接);調速失敗就存原速檔,不擋下載
