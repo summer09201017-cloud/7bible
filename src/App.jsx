@@ -677,6 +677,66 @@ const KEYWORD_PALETTE = [
   { bg: '#ddd6fe', fg: '#5b21b6' },
 ];
 
+/* ===== 和修本(線上譯本)專用小元件 =====
+ * 段落標題:rcuv 節文內嵌 <h2>…</h2>,已在 rcuv-core 外提。這裡貼在「和修本那一欄」的頂端,
+ * 刻意不像 8biblesearch 那樣提到所有譯本之上 —— 7bible 是多欄並列,提到最上面會讓人以為
+ * 那是和合本的標題(標題是和修本譯本自己的編輯產物)。
+ * 註腳:掛在該欄末尾的「譯註」鈕,點開列出本節所有註。位置標記(notes[].pos)在 7bible 不逐字插入,
+ * 因為 VerseText 為了字級對比會把中文逐字切開,插標記會打壞 diff/高亮;改成整節收在一個鈕裡。 */
+function RcuvHeading({ heading }) {
+  if (!heading) return null;
+  return (
+    <div style={{ fontSize: 13, fontWeight: 700, color: '#7b1fa2', margin: '2px 0 6px', letterSpacing: '0.02em' }}>
+      {heading}
+    </div>
+  );
+}
+
+function RcuvNotes({ notes }) {
+  const [open, setOpen] = useState(false);
+  if (!notes || notes.length === 0) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        title="和修本譯註(或譯/另有抄本),點開看"
+        style={{
+          display: 'inline-block', marginLeft: 6, padding: '1px 6px', minHeight: 22,
+          fontSize: 11, fontWeight: 700, color: '#7b1fa2', background: open ? '#f3e5f5' : 'transparent',
+          border: '1px solid #7b1fa2', borderRadius: 10, cursor: 'pointer', verticalAlign: 'middle',
+        }}
+      >
+        譯註 {notes.length}
+      </button>
+      {open && (
+        <div style={{
+          margin: '6px 0 2px', padding: '8px 10px', borderLeft: '3px solid #7b1fa2',
+          background: 'rgba(123,31,162,0.07)', borderRadius: '0 4px 4px 0',
+          fontSize: 13, lineHeight: 1.7, color: 'var(--page-text)',
+        }}>
+          {notes.map((n, i) => (
+            <div key={i} style={{ margin: '2px 0' }}>
+              <span style={{ fontWeight: 700, color: '#7b1fa2', marginRight: 4 }}>[{i + 1}]</span>
+              {n.body}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** 線上譯本取失敗時的明示。不可讓它退化成 '--' —— 那看起來像「這節沒有經文」,是騙人的。 */
+function RcuvError({ message }) {
+  return (
+    <span style={{ fontSize: 13, color: '#b71c1c' }}>
+      和修本沒取到（{message}）。和修本是線上譯本，需要連線；其餘譯本為離線資料，不受影響。
+    </span>
+  );
+}
+
 function VerseText({ text, keyword, compareText, exactPhrase }) {
   const cleanText = stripTags(text);
   const diffContext = useMemo(() => buildDiffContext(cleanText, compareText), [cleanText, compareText]);
@@ -1913,10 +1973,14 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                   return (
                     <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || 15 }}>
                       <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
+                      <RcuvHeading heading={vd?.rcuvHeading} />
                       <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="desktop-verse-num" style={{ color: 'var(--link-text)', fontSize: 13, fontWeight: 700, marginRight: 6, verticalAlign: 'top', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
                         {vNum}
                       </a>
-                      <VerseText text={text} compareText={diffEnabled ? baseText : ''} />
+                      {res.error && res.version === 'rcuv'
+                        ? <RcuvError message={res.error} />
+                        : <VerseText text={text} compareText={diffEnabled ? baseText : ''} />}
+                      <RcuvNotes notes={vd?.rcuvNotes} />
                     </div>
                   );
                 })}
@@ -2104,6 +2168,10 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
     return () => document.removeEventListener('global-copy', handler);
   }, [selected.size, handleTopCopy, getSelectedText]);
 
+  // 只勾了線上譯本時,「找不到經文」是騙人的 —— 是搜不了,不是查不到
+  if (verses.length === 0 && data.onlyOnline) {
+    return <EmptyState text={`目前只勾了線上譯本（${data.onlineExcluded.map((id) => VERSIONS.find((v) => v.id === id)?.label || id).join('、')}），無法做全文搜尋。請至少勾一個離線譯本（如和合本），或改用「約 3:16」這種經文參照方式查。`} />;
+  }
   if (verses.length === 0) return <EmptyState text={`找不到含有「${keyword}」的經文`} />;
 
   const goToChapter = (localAbbrev, chap) => {
@@ -2113,6 +2181,14 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
 
   return (
     <div className="result-bleed" style={S.resultCard}>
+      {/* 線上譯本無法全文搜尋 → 一定要明說。靜靜少一本 = 使用者以為和修本查不到這個詞。 */}
+      {data.onlineExcluded?.length > 0 && (
+        <div style={{ fontSize: 13, padding: '8px 16px', background: 'rgba(123,31,162,0.08)', color: '#7b1fa2', lineHeight: 1.6 }}>
+          ℹ️ {data.onlineExcluded.map((id) => VERSIONS.find((v) => v.id === id)?.label || id).join('、')}
+          是線上譯本，全文搜尋只能搜離線譯本，因此這次結果不含它。
+          請改用「經文參照」方式查（例：約 3:16）就會顯示。
+        </div>
+      )}
       <div style={{ ...S.statsBar, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: '12px 16px' }}>
         <span style={{ color: 'var(--warning-text)', fontSize: 14, fontWeight: 700 }}>關鍵字：<strong>「{keyword}」</strong></span>
         <span style={{ color: 'var(--warning-strong-text)', fontSize: 14 }}>共 <strong>{totalCount}</strong> 筆命中（顯示 {filteredVerses.length} / {verses.length} 節）<span style={{ color: 'var(--muted-text)', fontSize: 12, marginLeft: 6, fontWeight: 500 }}>{data.timeMs ? `${data.timeMs}ms` : ''}</span></span>

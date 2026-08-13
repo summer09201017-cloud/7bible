@@ -1,9 +1,14 @@
 import { findLocalAbbrev, bookMap } from './bible_books';
+import { fetchRcuvChapter } from './lib/rcuv-core';
 
 // Version details for UI - order = display order (left to right)
 // lang: 'zh' / 'en' - 用於差異高亮的同語系判斷
 export const VERSIONS = [
   { id: 'unv', label: '和合本 (CUV)', lang: 'zh' },
+  // 和修本(和合本2010)= 線上譯本,刻意不打包進 public/data:
+  // 信望愛 abv.php 對 rcuv 標 candownload=0(不可下載離線資料庫),文件並註明
+  // 「有些譯本僅授權給信望愛站使用…請勿任意使用」⇒ 只走 qb.php 即時查詢,不重新散布。
+  { id: 'rcuv', label: '和修本 (RCUV)', lang: 'zh', online: true },
   { id: 'niv', label: 'NIV', lang: 'en' },
   { id: 'esv', label: 'ESV', lang: 'en' },
   { id: 'web', label: 'WEB', lang: 'en' },
@@ -12,6 +17,10 @@ export const VERSIONS = [
   { id: 'asv', label: 'ASV', lang: 'en' },
   { id: 'kjv', label: 'KJV', lang: 'en' },
 ];
+
+/** 線上譯本:不在 public/data 裡,逐章向信望愛 qb.php 取。全文搜尋無法涵蓋(手上只有讀過的章)。 */
+export const ONLINE_VERSION_IDS = ['rcuv'];
+export const isOnlineVersion = (id) => ONLINE_VERSION_IDS.includes(id);
 
 const STRIP_SPACE_VERSIONS = ['unv'];
 const localCache = {};
@@ -258,8 +267,45 @@ async function lookupNivVerses(refs) {
   return results;
 }
 
+/** 和修本:逐章向信望愛取。record 的 bible_text 是「純淨經文」(不含 [n] 標記),
+ *  段落標題與註腳另放 rcuvHeading / rcuvNotes ⇒ 複製/朗讀(都走 stripTags(bible_text))自動拿到乾淨版。 */
+async function fetchRcuvVersion(abbrev, chap, sec) {
+  const bEntry = getBookEntry(abbrev);
+  // ⚠ 必須用中文縮寫(names[0]):qb.php 的 engs= 會查錯書(engs=John 回羅馬書)。
+  // 全 66 卷已用 names[0] 對 rcuv 實測通過。
+  const zh = bEntry && bEntry.names && bEntry.names[0];
+  if (!zh) return { version: 'rcuv', error: '找不到書卷對應', record: [] };
+
+  try {
+    const verses = await fetchRcuvChapter(zh, chap);
+    const pick = (n) => {
+      const v = verses.get(n);
+      if (!v) return null;
+      return { sec: n, bible_text: v.text, rcuvHeading: v.heading || '', rcuvNotes: v.notes || [] };
+    };
+    if (sec) {
+      if (String(sec).includes('-')) {
+        const [start, end] = String(sec).split('-').map(Number);
+        const out = [];
+        for (let i = start; i <= end; i += 1) { const r = pick(i); if (r) out.push(r); }
+        return { version: 'rcuv', record: out };
+      }
+      const r = pick(parseInt(sec, 10));
+      return { version: 'rcuv', record: r ? [r] : [] };
+    }
+    return {
+      version: 'rcuv',
+      record: [...verses.keys()].sort((a, b) => a - b).map(pick).filter(Boolean),
+    };
+  } catch (e) {
+    // 失敗要往上帶,讓畫面明說「沒取到」——不可讓它退化成 '--'(看起來像「這節沒經文」)
+    return { version: 'rcuv', error: e.message || '連線失敗', record: [] };
+  }
+}
+
 export async function fetchLocalVersion(version, abbrev, chap, sec) {
   if (version === 'niv') return fetchNivVersion(abbrev, chap, sec);
+  if (version === 'rcuv') return fetchRcuvVersion(abbrev, chap, sec);
 
   try {
     const data = await loadLocalBible(version);
@@ -331,7 +377,13 @@ export async function fetchBible(query, versions, options = {}) {
   if (trimmedQuery.length < 2) throw new Error('關鍵字至少需要 2 個字元');
 
   const primaryVersion = isChinese(trimmedQuery) ? 'unv' : 'asv';
-  const searchVersions = options.searchSelectedVersions ? selectedVersions : [primaryVersion];
+  // 線上譯本不能做全文搜尋:①手上只有讀過的章,不是全本 ②即使拿命中清單去逐節補查,
+  // 一次搜尋可能要向信望愛抓上百章 —— 那是把志工營運的服務當自己的資料庫用。
+  // ⇒ 兩段都排除,並把被排除的譯本回報給 UI 明說(靜靜少一本 = 使用者以為和修本查不到這個詞)。
+  const onlineExcluded = selectedVersions.filter(isOnlineVersion);
+  const offlineSelected = selectedVersions.filter((v) => !isOnlineVersion(v));
+  const searchVersions = (options.searchSelectedVersions ? offlineSelected : [primaryVersion])
+    .filter((v) => !isOnlineVersion(v));
   const refMap = new Map();
   const matchCountByVersion = {};
 
@@ -358,7 +410,7 @@ export async function fetchBible(query, versions, options = {}) {
     return a.sec - b.sec;
   });
 
-  const results = await Promise.all(selectedVersions.map(async (version) => {
+  const results = await Promise.all(offlineSelected.map(async (version) => {
     try {
       const record = await lookupVersion(version, refs);
       return { version, record, matchedCount: matchCountByVersion[version] };
@@ -367,5 +419,13 @@ export async function fetchBible(query, versions, options = {}) {
     }
   }));
 
-  return { mode: 'keyword', keyword: trimmedQuery, results, searchOptions: options };
+  // onlineExcluded 交給 UI 明說;onlyOnline = 使用者只勾了線上譯本 ⇒ 不是「查無結果」,是「搜不了」
+  return {
+    mode: 'keyword',
+    keyword: trimmedQuery,
+    results,
+    searchOptions: options,
+    onlineExcluded,
+    onlyOnline: onlineExcluded.length > 0 && offlineSelected.length === 0,
+  };
 }
