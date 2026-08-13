@@ -2,16 +2,18 @@
 
 Guidance for future Codex agents working in this repo.
 
-## 現況 (2026-07-19)
+## 現況 (2026-08-14)
 
 - **上線中**：https://7bible.netlify.app/ ，GitHub repo `summer09201017-cloud/7bible`，Netlify **已連 GitHub 自動部署**（push `main` 即上線；site id `6d0419a7-7222-4c5e-a9c3-610b0a7cb3a7`）。不需手動 `netlify deploy`。
 - **已完成到 Wave 3**：分頁化（查詢 / 讀經進度與足跡）、讀經足跡、串珠交叉引用、多項 UX 修正；同時**移除**每日金句、背經模式、個人筆記/收藏/螢光筆（見下方「Removed features」）。
-- **健康度**：`npm run lint` 綠、`npx vite build` 成功、無自動化測試（沒有 `npm test`）。SW 版本 `bible-app-v28`(0810)。
+- **健康度**：`npm run lint`（僅有一條**既存**的 `getFhlCommentaryUrl` unused 警示，非本輪造成）、`npm run build` 成功、無自動化測試（沒有 `npm test`）。SW 版本 `bible-app-v29`(0814)。
+- **最近一輪 (2026-08-14)**：📖 **和修本（和合本2010, `rcuv`）＝第 9 本譯本、線上取用**。
+  完整說明與 6 條 gotcha 見 `CLAUDE.md` 的「和修本」節（**本檔不重複，以 CLAUDE.md 為準**）。
 - **下一步（roadmap 第一列）**：搜尋移到 Web Worker + 簡單索引（根治多譯本全書掃描卡頓）。
 
 ## Project
 
-多譯本聖經查詢 — pure-frontend PWA. Loads 8 bible translations from local JSON, supports cross-version side-by-side comparison, keyword/reference search, per-book cross-references (串珠), a usage-based reading footprint, and offline reading. Deployed via Netlify (auto-deploy on push to `main`).
+多譯本聖經查詢 — pure-frontend PWA. Loads **8 bible translations from local JSON + 1 fetched live**（和修本/rcuv）, supports cross-version side-by-side comparison, keyword/reference search, per-book cross-references (串珠), a usage-based reading footprint, and offline reading. Deployed via Netlify (auto-deploy on push to `main`).
 
 ## Stack
 

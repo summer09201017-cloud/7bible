@@ -1,8 +1,25 @@
 # Roadmap — 多譯本聖經查詢
 
-最後更新:2026-08-10。線上:https://7bible.netlify.app/(push main 自動部署;SW **v25**)
+最後更新:2026-08-14。線上:https://7bible.netlify.app/(push main 自動部署;SW **v29**)
 
 ## ✅ 已完成（別重做）
+
+**2026-08-14(HFP 機;v29,上線收斂驗過)**
+- 📖 **v29 和修本(和合本2010, `rcuv`)＝第 9 本譯本、線上取用**(使用者:「7bible 也加入和修本」)。
+  信望愛 `qb.php?version=rcuv` 逐章即時查,**刻意不打包**進 `public/data/`:`abv.php` 對 rcuv 標
+  `candownload=0`(不可下載離線資料庫),`/json/` 文件明載「有些譯本僅授權給信望愛站使用…
+  請勿任意使用,以免違法」⇒ 查詢導流,不重新散布。核心抽成 `src/lib/rcuv-core.js`
+  (**正本在 skill `fhl-bible-api/assets/`**,與 8biblesearch 共用同一份邏輯,勿就地改)。
+  - 呈現**刻意與 8biblesearch 不同**(版面不同,不是漏做):段落標題貼在「和修本那一欄」頂端
+    (多欄並列時提到最上面會讓人以為那是和合本的標題);註腳收成欄末「譯註 n」鈕
+    (不逐字插 `[n]`——`VerseText` 為字級對比會把中文逐字切開,插標記會打壞 diff/高亮)。
+  - `bible_text` 存**純淨經文**,標題註腳放 `rcuvHeading`/`rcuvNotes` ⇒ 複製/朗讀走
+    `stripTags(bible_text)` 自動拿到乾淨經文(實測複製不含 `[n]` 也不含「或譯」內容)。
+  - 全 66 卷書名對應逐卷實測通過(`chineses=` 用 `names[0]`;`engs=John` 會回羅馬書)。
+  - 失敗明示:該欄顯示「和修本沒取到(原因)」而**不是**退化成 `--`(那看起來像這節沒經文);
+    App.jsx 原本不處理 version 層的 `.error`,是這輪補的。
+  - ⚠ 驗斷網要用 `context.setOffline(true)`:`sw.js` 對 `bible.fhl.net` 是直通,
+    SW 發出的 fetch 不受 Playwright `page.route` 影響(0814 差點誤判功能壞掉)。
 
 **2026-08-10(DEYI 機;v24→v28,上線收斂驗過)**
 - 📐 **v28 註釋彈窗滿版**(使用者:「更高更寬,上下到邊界」):height 100dvh、寬 min(900px,100vw)、
