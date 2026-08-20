@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bible-app-v29';   /* v29(0814):+和修本(rcuv)線上譯本(qb.php 逐章即時查;abv.php 標 candownload=0 故不打包),段落標題貼該欄頂端、譯註收在「譯註 n」鈕,純淨經文進 bible_text ⇒ 複製/朗讀自動乾淨;全文搜尋不含線上譯本並明示;v28=註釋彈窗滿版 */
+const CACHE_NAME = 'bible-app-v30';   /* v29(0814):+和修本(rcuv)線上譯本(qb.php 逐章即時查;abv.php 標 candownload=0 故不打包),段落標題貼該欄頂端、譯註收在「譯註 n」鈕,純淨經文進 bible_text ⇒ 複製/朗讀自動乾淨;全文搜尋不含線上譯本並明示;v28=註釋彈窗滿版 */
 
 const STATIC_ASSETS = [
   '/',
@@ -60,4 +60,9 @@ self.addEventListener('fetch', (event) => {
       });
     })
   );
+});
+
+// 🏷️ 版號回報(0820 全艦隊批次):頁尾徽章問「實際執行中的版本」,答案=本 SW 的快取名。
+self.addEventListener('message', function (e) {
+  if (e && e.data === 'GET_VERSION' && e.source) e.source.postMessage({ type: 'SW_VERSION', v: CACHE_NAME });
 });
