@@ -3247,6 +3247,21 @@ export default function App() {
               📊 使用統計（同工用）
             </a>
           </div>
+          {/* 🏷 改版簡歷(VT2 0916):彈窗本體在 index.html(右下角徽章那一段之後),
+              這裡只放開它的鈕 —— 徽章維持 pointer-events:none,不拿它當按鈕。 */}
+          <div style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={() => window.__openVersionSheet?.()}
+              style={{
+                font: 'inherit', fontSize: 12, lineHeight: 1.2, padding: '8px 14px', minHeight: 40,
+                color: 'inherit', background: 'transparent', border: '1px solid currentColor',
+                borderRadius: 999, opacity: 0.75, cursor: 'pointer',
+              }}
+            >
+              🏷️ 改版簡歷・看看前幾版做了什麼
+            </button>
+          </div>
           <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7 }}>
             build {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}
           </div>

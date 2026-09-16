@@ -76,6 +76,102 @@
     })();
     </script>
   <div id="appVerBadge" style="position:fixed;right:6px;bottom:4px;font-size:11px;line-height:1;opacity:.55;z-index:2147483000;pointer-events:none;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);font-family:system-ui,sans-serif"></div>
+<!-- 🏷 改版簡歷(VT2 2026-09-16 補齊 game-must-haves ⑦ 的下半件)。
+     徽章只回答「我開到哪一版」,這一份回答「每一版做了什麼」——寫給家長與老師看。
+     ★ 徽章維持 pointer-events:none(標籤不是按鈕);簡歷從選單那顆鈕開。
+     ★ 改版時在 APP_VERSIONS 最前面插一筆就好。 -->
+<style>#appVerSheet[hidden]{display:none!important}</style>
+<div id="appVerSheet" hidden style="position:fixed;inset:0;z-index:2147483001;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,'Noto Sans TC',sans-serif">
+  <div style="max-width:460px;width:100%;max-height:72vh;overflow-y:auto;background:var(--card, #fffdf8);border:1px solid var(--border, #d9cfc0);border-radius:12px;padding:16px 18px;color:var(--text, #2c2419);box-shadow:0 18px 50px rgba(0,0,0,.45)">
+    <h3 style="margin:0 0 4px;font-size:16px">🏷️ 改版簡歷</h3>
+    <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:var(--text2, #6b5d4d)">每一版新增了什麼,白話寫給家長與老師看。前幾版都列在下面,最新的在最上面。</p>
+    <ol id="appVerList" style="margin:0;padding-left:18px;font-size:13px;line-height:1.85"></ol>
+    <button type="button" id="appVerClose" style="margin-top:14px;width:100%;min-height:44px;font:inherit;color:var(--text, #2c2419);background:var(--tag-bg, #f0e8d8);border:1px solid var(--border, #d9cfc0);border-radius:8px;cursor:pointer">關閉</button>
+  </div>
+</div>
+<script>
+(function () {
+  // 最新的放最前面。改版只要在這裡插一筆。
+  var APP_VERSIONS = [
+    {
+      "v": "v31",
+      "d": "2026-09-16",
+      "t": "頁尾多一顆「🏷️ 改版簡歷」鈕,點開就看得到每一版做了什麼。以前畫面右下角只看得到版本號,卻看不到那一版改了什麼。"
+    },
+    {
+      "v": "v30",
+      "d": "2026-08-20",
+      "t": "畫面右下角開始顯示版本號,回報問題時對得上是哪一版;十秒後會自動淡掉,不擋畫面。"
+    },
+    {
+      "v": "v29",
+      "d": "2026-08-14",
+      "t": "新增第 9 本譯本「和修本(和合本 2010)」,逐章即時查詢。"
+    },
+    {
+      "v": "v27 到 v28",
+      "d": "2026-08-13",
+      "t": "註釋改成獨立彈窗:遮罩置中、自己可以捲、按 Esc 關掉,還補回「在新分頁開啟」鈕;手機上彈窗改成滿版,上下貼齊螢幕邊,讀起來不再擠在一小塊裡。"
+    },
+    {
+      "v": "v25 到 v26",
+      "d": "2026-08-12",
+      "t": "站內就有大字註釋面板:註釋直接在頁面裡展開,原文編號可以就地看中文字義(希臘文/希伯來文與文法),字典裡的參照點了會跳過去,字級跟著閱讀字級走。另外多了回頂鈕(捲一個半螢幕以上才出現),手機上經文也再貼邊一次——每一行大約多放六個中文字。"
+    },
+    {
+      "v": "v23 到 v24",
+      "d": "2026-08-10",
+      "t": "新增「原文」鈕:每一節都可以打開來看帶編號的和合本,點一個詞就看到它的中文字義與文法;手機上的搜尋結果卡改成滿版,每一行從約 19 個中文字變成約 23 個。"
+    },
+    {
+      "v": "v21 到 v22",
+      "d": "2026-08-09",
+      "t": "新增「讀經計畫」:一年、兩年、三年一鍵設定,也可以自訂半年到二十年;原本用年曆制的人完全不受影響,不設定就照舊。搜尋結果每一筆也多了「⊕ 前後文」,不跳頁就能看前後兩節。"
+    },
+    {
+      "v": "v19 到 v20",
+      "d": "2026-08-09",
+      "t": "新增「簡易模式」:搜尋列一鍵切換,把進階搜尋、差異高亮、串珠、註釋、複製格式這些收起來,查詢與讀經照常;同時把畫面上的小字放大,而且開放兩指捏合放大(長輩看不清楚時可以自己放大)。另外加上溫和的備份提醒:資料累積到一定程度、又三十天沒匯出時,會在足跡卡上方提醒一次。"
+    },
+    {
+      "v": "v17 到 v18",
+      "d": "2026-08-09",
+      "t": "修好譯本偏好會被蓋掉的三個入口(重跑歷史、網址列、深連結);清空歷史前會先問一次;朗讀速度與譯本選擇也納入備份。同一輪加上破音字字典,朗讀時「行傳」不會再唸成「行走的行」。"
+    },
+    {
+      "v": "v13 到 v16",
+      "d": "2026-07-25",
+      "t": "朗讀可以選譯本(預設 NIV);頁尾加上給同工看的使用統計連結;開始記錄匿名的開啟與真實停留時間,好知道大家實際讀了多久。"
+    }
+  ];
+  var sheet = document.getElementById('appVerSheet');
+  var list = document.getElementById('appVerList');
+  var closeBtn = document.getElementById('appVerClose');
+  if (!sheet || !list || !closeBtn) return;
+  var esc = function (x) {
+    return String(x).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; });
+  };
+  list.innerHTML = APP_VERSIONS.map(function (r) {
+    return '<li style="margin-bottom:.5em"><b>' + esc(r.v) + '</b>(' + esc(r.d) + '):' + esc(r.t) + '</li>';
+  }).join('');
+  function openSheet() { sheet.hidden = false; }
+  function shutSheet() { sheet.hidden = true; }
+  window.__openVersionSheet = openSheet;
+  window.__appVersion = APP_VERSIONS[0].v + '(' + APP_VERSIONS[0].d + ')';
+  // ★ 開簡歷那顆鈕**不一定在本段程式之前**就被解析完(--trigger=fixed 的 anchor 常在徽章後面)。
+  //   直接 getElementById 會拿到 null,鈕就變成按了沒反應——而且靜態檢查全綠、截圖也看不出來。
+  //   ⇒ 還在解析中就等 DOMContentLoaded 再綁。
+  function bindOpener() {
+    var b = document.getElementById('appVerOpen');
+    if (b) b.addEventListener('click', openSheet);
+  }
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', bindOpener);
+  else bindOpener();
+  closeBtn.addEventListener('click', shutSheet);
+  sheet.addEventListener('click', function (e) { if (e.target === sheet) shutSheet(); });
+  addEventListener('keydown', function (e) { if (e.key === 'Escape' && !sheet.hidden) shutSheet(); });
+})();
+</script>
     <script>
       /* 🏷️ appVerBadgeFade（0828）：版號徽章是 position:fixed 在右下角，實測會蓋住大廳卡片、
          遊戲的「難度 / 開始比賽」按鈕——pointer-events:none 只讓「點擊」穿過去，字還是被蓋著。
