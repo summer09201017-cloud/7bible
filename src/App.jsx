@@ -31,6 +31,24 @@ const LS_KEYS = {
   readingLog: 'bible-tool-reading-log-v1',
 };
 
+// v32:經文預設字 15→19。usePersistentState 一載入就把預設值寫進 localStorage,
+// 所以「從沒調過字級」的舊用戶存的也是 15 ⇒ 只做一次:存的剛好是舊預設 15 才改成 19;調過的(不是 15)一律不動。
+const DEFAULT_FONT_SIZE = 19;
+const FONT19_MIGRATED_KEY = 'sevenbible-font19-migrated';
+(function migrateFontSizeDefault() {
+  try {
+    if (localStorage.getItem(FONT19_MIGRATED_KEY)) return;
+    if (localStorage.getItem(LS_KEYS.fontSize) === '15') localStorage.setItem(LS_KEYS.fontSize, String(DEFAULT_FONT_SIZE));
+    localStorage.setItem(FONT19_MIGRATED_KEY, '1');
+  } catch { /* noop */ }
+})();
+
+// v32 第一次來的說明卡:裝置層偏好,刻意不進備份
+const WELCOME_SEEN_KEY = 'sevenbible-welcome-seen';
+function readWelcomeSeen() {
+  try { return localStorage.getItem(WELCOME_SEEN_KEY) === '1'; } catch { return false; }
+}
+
 const BOOK_GROUPS = [
   { label: '摩西五經', start: 0, end: 4 },
   { label: '歷史書', start: 5, end: 16 },
@@ -77,9 +95,9 @@ const S = {
   resultCard: { background: 'var(--surface-solid)', boxShadow: 'var(--result-shadow)', borderTop: '1px solid var(--border-soft)', borderBottom: '1px solid var(--border-soft)', borderRadius: 0, overflow: 'hidden' },
   checkbox: { width: 18, height: 18, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0 },
   statsBar: { background: 'var(--stats-bar-bg)', borderBottom: '1px solid var(--border-soft)' },
-  select: { background: 'var(--input-bg)', border: '2px solid var(--border-strong)', borderRadius: '9px', padding: '10px 12px', fontSize: 14, outline: 'none', color: 'var(--heading-text)', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 130 },
-  smallBtn: { border: '1px solid var(--border-strong)', background: 'var(--input-bg)', color: 'var(--heading-text)', borderRadius: 8, padding: '6px 10px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }, /* 0809 B1:12→14,長輩看得到 */
-  dangerBtn: { border: '1px solid var(--danger-border)', background: 'var(--danger-bg)', color: 'var(--danger-text)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  select: { background: 'var(--input-bg)', border: '2px solid var(--border-strong)', borderRadius: '9px', padding: '10px 12px', fontSize: 14, color: 'var(--heading-text)', fontWeight: 600, cursor: 'pointer', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)', flex: 1, minWidth: 130 }, /* v32:拿掉 outline:none,焦點框見 index.css */
+  smallBtn: { border: '1px solid var(--border-strong)', background: 'var(--input-bg)', color: 'var(--heading-text)', borderRadius: 8, padding: '6px 10px', minHeight: 44, fontSize: 16, fontWeight: 700, cursor: 'pointer' }, /* v32:14→16、高 44,長輩按得到 */
+  dangerBtn: { border: '1px solid var(--danger-border)', background: 'var(--danger-bg)', color: 'var(--danger-text)', borderRadius: 8, padding: '6px 10px', minHeight: 44, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
   textarea: { width: '100%', minHeight: 72, resize: 'vertical', border: '1px solid var(--border-strong)', borderRadius: 8, padding: 8, fontSize: 13, lineHeight: 1.5, outline: 'none', background: 'var(--input-bg)', color: 'var(--page-text)' },
 };
 
@@ -788,18 +806,6 @@ function VerseText({ text, keyword, compareText, exactPhrase }) {
   );
 }
 
-function getFhlCommentaryUrl(abbrev, chap, sec) {
-  const fhlEngs = FHL_ENGS_BY_LOCAL[abbrev];
-  if (!fhlEngs) return null;
-  const params = new URLSearchParams({
-    book: '3',
-    engs: fhlEngs,
-    chap: String(chap),
-    sec: String(sec),
-  });
-  return `https://bible.fhl.net/new/com.php?${params.toString()}`;
-}
-
 function CopyVerseButton({ getText, countLabel }) {
   const [copied, setCopied] = useState(false);
   const handleClick = async (e) => {
@@ -1197,7 +1203,7 @@ function CommentaryModal({ abbrev, chap, sec, fontSize, onNavigate, onClose }) {
     }
   };
 
-  const fs = fontSize || 15;
+  const fs = fontSize || DEFAULT_FONT_SIZE;
   const go = (q) => { onClose(); onNavigate(q); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const navBtn = { ...S.smallBtn, borderRadius: 999, padding: '6px 14px' };
   const renderNav = (info, arrow) => {
@@ -1528,7 +1534,7 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
     <div style={{ ...S.card, padding: `${topBarH + 16}px 24px 24px`, marginTop: -topBarH, marginBottom: 0, borderRadius: 0, position: 'relative', zIndex: 5 }}>
       <div style={{ maxWidth: 980, margin: '0 auto' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--heading-text)', textAlign: 'center', marginBottom: 18, textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-        多譯本聖經查詢 <small style={{ fontSize: 13, color: 'var(--subtle-text)', marginLeft: 8, verticalAlign: 'middle', fontWeight: 500, opacity: 0.8 }}>v1.5</small>
+        多譯本聖經查詢
       </h1>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 18 }}>
@@ -1554,8 +1560,9 @@ function SearchBar({ onSearch, isLoading, versions, setVersions, bibleStructure,
         />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ color: 'var(--muted-text)', fontSize: 12, lineHeight: 1.5 }}>
-            章節可輸入 John 3:16 / Psalm 23；關鍵字可輸入多詞，進階搜尋可切 AND/OR、完整片語、排除詞與查詢範圍。
+          {/* v32:照 api.js makeMatcher 的真實語法寫——中文的空白會被吃掉(和合本 stripSpaces),只有英文逗號會分詞;OR 是進階搜尋的下拉,不是打字 */}
+          <div style={{ color: 'var(--page-text)', fontSize: 18, lineHeight: 1.6 }}>
+            查一節:打「約 3:16」或「詩 23」。找詞:打「恩典」;好幾個詞都要有,用英文逗號隔開,例如「愛心,恩典」。要「有一個就算」:按「進階搜尋」,在「多字條件」選 OR。
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {SEARCH_CHIPS.map((chip) => (
@@ -1766,11 +1773,12 @@ const btnFontSize = {
   fontWeight: 700,
   cursor: 'pointer',
   padding: '6px 12px',
-  fontSize: 14,
+  fontSize: 18,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  minWidth: 40,
+  minWidth: 48,
+  minHeight: 48,
 };
 
 function FontSizeControl({ fontSize, setFontSize, fixed, topSlot }) {
@@ -1780,13 +1788,13 @@ function FontSizeControl({ fontSize, setFontSize, fixed, topSlot }) {
       <button type="button" onClick={() => setFontSize((s) => Math.max(10, s - 1))} style={btnFontSize} title="縮小">A-</button>
       <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--heading-text)', minWidth: 32, textAlign: 'center' }}>{fontSize}</span>
       <button type="button" onClick={() => setFontSize((s) => Math.min(40, s + 1))} style={btnFontSize} title="放大">A+</button>
-      <button type="button" onClick={() => setFontSize(15)} style={{ ...btnFontSize, fontSize: 12, padding: '6px 10px' }} title="重置">重置</button>
+      <button type="button" onClick={() => setFontSize(DEFAULT_FONT_SIZE)} style={{ ...btnFontSize, padding: '6px 10px' }} title="重置">重置</button>
     </>
   );
 
   if (fixed) {
     return (
-      <div id="app-top-bar" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'var(--topbar-bg)', padding: '8px 16px', borderBottom: '2px solid var(--border-strong)', boxShadow: 'var(--topbar-shadow)' }}>
+      <div id="app-top-bar" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: 16, rowGap: 8, background: 'var(--topbar-bg)', padding: '8px 16px', borderBottom: '2px solid var(--border-strong)', boxShadow: 'var(--topbar-shadow)' }}>
         {topSlot}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>{content}</div>
       </div>
@@ -1971,7 +1979,7 @@ function VerseViewer({ data, bibleStructure, onNavigate, fontSize, setFontSize, 
                   const vi = VERSIONS.find((v) => v.id === res.version);
                   const col = VERSION_COLORS[res.version] || 'var(--page-text)';
                   return (
-                    <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || 15 }}>
+                    <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || DEFAULT_FONT_SIZE }}>
                       <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
                       <RcuvHeading heading={vd?.rcuvHeading} />
                       <a onClick={(e) => { e.preventDefault(); onNavigate(`${bookName} ${data.chap}`); window.scrollTo({ top: 0, behavior: 'smooth' }); }} href="#top" className="desktop-verse-num" style={{ color: 'var(--link-text)', fontSize: 13, fontWeight: 700, marginRight: 6, verticalAlign: 'top', textDecoration: 'underline', cursor: 'pointer' }} title={`跳到 ${data.chap} 章`}>
@@ -2268,7 +2276,7 @@ function KeywordViewer({ data, onNavigate, fontSize, setFontSize, diffEnabled, d
                   const vi = VERSIONS.find((v) => v.id === res.version);
                   const col = VERSION_COLORS[res.version] || 'var(--page-text)';
                   return (
-                    <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || 15 }}>
+                    <div key={res.version} className="verse-text-content" style={{ color: col, lineHeight: 1.75, fontSize: fontSize || DEFAULT_FONT_SIZE }}>
                       <div className="mobile-version-name" style={{ color: col }}>{vi?.label}</div>
                       <a onClick={(e) => { e.preventDefault(); goToChapter(vo.localAbbrev, vo.chap); }} href="#top" className="desktop-verse-num" style={{ color: 'var(--link-text)', fontSize: 11, fontWeight: 700, marginRight: 6, verticalAlign: 'top', opacity: 0.9, textDecoration: 'underline', cursor: 'pointer' }} title={`查看 ${getBookName(vo.localAbbrev)} 第 ${vo.chap} 章`}>
                         {getBookName(vo.localAbbrev)} {vo.chap}:{vo.sec}
@@ -2562,7 +2570,7 @@ function FootprintCard({ readingLog, bibleStructure, onNavigate }) {
             key={r.id}
             type="button"
             onClick={() => setRangeId(r.id)}
-            style={rangeId === r.id ? { ...S.pillActive, padding: '5px 12px', fontSize: 12 } : { ...S.smallBtn, borderRadius: 999 }}
+            style={rangeId === r.id ? { ...S.pillActive, padding: '5px 12px', minHeight: 44, fontSize: 16 } : { ...S.smallBtn, borderRadius: 999 }}
           >
             {r.label}
           </button>
@@ -2619,6 +2627,11 @@ function UserLibrary({ history, onRunHistory, onClearHistory, onDeleteHistory, o
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // v32:合併邏輯是「次數相加」,同一個檔匯兩次會加倍 ⇒ 先講清楚再匯(合併方式本身不改)
+    if (!window.confirm('匯入會併入這台裝置的資料;同一個備份檔匯入兩次,讀經次數會重複計算。\n\n確定要匯入嗎?')) {
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -2696,8 +2709,8 @@ function ViewTabs({ view, setView, big }) {
               background: active ? 'linear-gradient(145deg, #43a047, #2e7d32)' : 'transparent',
               color: active ? 'white' : 'var(--heading-text)',
               borderRadius: 8,
-              padding: big ? '6px 16px' : '7px 13px',
-              fontSize: big ? 15 : 14, /* 0809 B1:12/13→14/15 */
+              padding: '12px 18px',
+              fontSize: 17, /* v32:15→17、高約 48,長輩按得到 */
               fontWeight: 800,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
@@ -2806,6 +2819,46 @@ function InstallButton() {
   return <button type="button" onClick={handleInstall} style={{ ...S.btnInstall, padding: '10px 22px', fontSize: 14 }}>安裝 App</button>;
 }
 
+const footerBtn = {
+  font: 'inherit', fontSize: 17, fontWeight: 700, lineHeight: 1.3, minHeight: 48, padding: '10px 18px',
+  color: 'var(--heading-text)', background: 'var(--input-bg)', border: '2px solid var(--border-strong)',
+  borderRadius: 999, cursor: 'pointer',
+};
+
+function WelcomeCard({ onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const para = { margin: '0 0 14px', fontSize: 18, lineHeight: 1.7, color: 'var(--page-text)' };
+  const head = { display: 'block', fontWeight: 800, color: 'var(--heading-text)' };
+  return (
+    <div
+      id="welcome-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="welcome-title"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}
+    >
+      <div style={{ background: 'var(--surface-solid)', color: 'var(--page-text)', borderRadius: 14, maxWidth: 520, width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 18px 50px rgba(0,0,0,0.4)' }}>
+        <div style={{ overflowY: 'auto', padding: '18px 18px 4px', minHeight: 0 }}>
+          <h2 id="welcome-title" style={{ margin: '0 0 12px', fontSize: 22, color: 'var(--heading-text)' }}>👋 歡迎使用多譯本聖經查詢</h2>
+          <p style={para}><b style={head}>這是什麼</b>把和合本、新譯本、NIV、ESV 等好幾本中英文聖經排在一起對照著讀,也可以找經文、記錄讀經進度。不用註冊,資料只存在這台裝置。</p>
+          <p style={para}><b style={head}>怎麼查一節</b>在最上面的大框打「約 3:16」或「詩 23」,再按紅色的「查詢」。也可以用下面的「選擇書卷」「章」「節」一格一格選。</p>
+          <p style={para}><b style={head}>怎麼找一個詞</b>直接打詞,例如「恩典」,再按「查詢」。好幾個詞都要有,就用英文逗號隔開,例如「愛心,恩典」。</p>
+          <p style={para}><b style={head}>字可以放大</b>畫面最上面按「A+」經文字放大、「A-」縮小、「重置」回到原本大小。手機也可以用兩指把畫面撐開放大。</p>
+        </div>
+        <div style={{ padding: '10px 18px 16px', flexShrink: 0 }}>
+          <button type="button" onClick={onClose} style={{ width: '100%', minHeight: 52, fontSize: 18, fontWeight: 800, color: 'white', background: 'linear-gradient(145deg, #43a047, #2e7d32)', border: 'none', borderRadius: 10, cursor: 'pointer' }}>知道了,開始使用</button>
+          <p style={{ margin: '10px 0 0', fontSize: 16, lineHeight: 1.5, color: 'var(--page-text)', textAlign: 'center' }}>想再看這張說明,按頁面最下面的「使用說明」。</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -2813,7 +2866,8 @@ export default function App() {
   const [versions, setVersions] = usePersistentState(LS_KEYS.versions, ['unv', 'niv', 'esv', 'ncv', 'lzz']);
   // 🧓 簡易模式(0809 B1):收起查經工具(進階搜尋/差異高亮/串珠/註釋/複製格式/排序箭頭)。裝置層偏好,刻意不進備份。
   const [simpleMode, setSimpleMode] = usePersistentState('sevenbible-simple-mode', false);
-  const [fontSize, setFontSize] = usePersistentState(LS_KEYS.fontSize, 15);
+  const [fontSize, setFontSize] = usePersistentState(LS_KEYS.fontSize, DEFAULT_FONT_SIZE);
+  const [showWelcome, setShowWelcome] = useState(() => !readWelcomeSeen());
   const [diffEnabled, setDiffEnabled] = usePersistentState(LS_KEYS.diffEnabled, true);
   const [diffBase, setDiffBase] = usePersistentState(LS_KEYS.diffBase, '');
   const [history, setHistory] = usePersistentState(LS_KEYS.history, []);
@@ -3084,6 +3138,11 @@ export default function App() {
     setBackupNudgeTick((t) => t + 1);
   }, []);
 
+  const closeWelcome = useCallback(() => {
+    setShowWelcome(false);
+    try { localStorage.setItem(WELCOME_SEEN_KEY, '1'); } catch { /* noop */ }
+  }, []);
+
   const exportData = useCallback(() => {
     const payload = {
       app: '多譯本聖經查詢',
@@ -3163,6 +3222,8 @@ export default function App() {
     }
   }, [setHistory, setReadingProgress, setReadingLog, setPlanConfig, setVersions, setFontSize, setTheme, setCopyFormat, setDiffEnabled, setDiffBase, setBookmark]);
 
+  const appVersionLabel = (typeof window !== 'undefined' && window.__appVersion) || '';
+
   return (
     <div id="top" data-theme={resolvedTheme} className={simpleMode ? 'simple-mode' : undefined} style={{ ...themeVars, ...S.bg, padding: 0, paddingTop: topBarH, paddingBottom: 32, fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1600, margin: '0 auto', padding: '0 16px' }}>
@@ -3241,32 +3302,31 @@ export default function App() {
           </>
         )}
         <footer style={{ marginTop: 48, textAlign: 'center', color: 'var(--muted-text)', fontSize: 12, paddingBottom: 32 }}>
+          {/* 🏷 更新紀錄(v32):版號唯一來源＝index.html 的 APP_VERSIONS[0](window.__appVersion);彈窗本體也在 index.html。
+              這一列常駐、不疊透明度;建置時間收進 title。 */}
+          <div id="app-version-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 14 }}>
+            <button
+              type="button"
+              id="app-version-open"
+              onClick={() => window.__openVersionSheet?.()}
+              title={`build ${typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}`}
+              style={footerBtn}
+            >
+              {appVersionLabel ? `版本 ${appVersionLabel}· 更新紀錄` : '更新紀錄'}
+            </button>
+            <button type="button" id="welcome-reopen" onClick={() => setShowWelcome(true)} style={footerBtn}>
+              📖 使用說明
+            </button>
+          </div>
           資料來源：信望愛 (FHL) 聖經、本機 JSON、8 種譯本離線可用 · 串珠資料：openbible.info (CC-BY)
           <div style={{ marginTop: 6 }}>
             <a href="https://hfpc-play-stats.summer09201017.workers.dev/stats" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
               📊 使用統計（同工用）
             </a>
           </div>
-          {/* 🏷 改版簡歷(VT2 0916):彈窗本體在 index.html(右下角徽章那一段之後),
-              這裡只放開它的鈕 —— 徽章維持 pointer-events:none,不拿它當按鈕。 */}
-          <div style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              onClick={() => window.__openVersionSheet?.()}
-              style={{
-                font: 'inherit', fontSize: 12, lineHeight: 1.2, padding: '8px 14px', minHeight: 40,
-                color: 'inherit', background: 'transparent', border: '1px solid currentColor',
-                borderRadius: 999, opacity: 0.75, cursor: 'pointer',
-              }}
-            >
-              🏷️ 改版簡歷・看看前幾版做了什麼
-            </button>
-          </div>
-          <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7 }}>
-            build {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}
-          </div>
         </footer>
       </div>
+      {showWelcome && <WelcomeCard onClose={closeWelcome} />}
       <Toast />
       <BackToTopButton />
     </div>

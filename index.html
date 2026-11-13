@@ -75,18 +75,17 @@
       setInterval(function(){ if(!visStart) return; var live=Math.min(total+Math.round((Date.now()-visStart)/1000),1800); if(live>=3) window.psPing('7bible-dwlast', live); }, 25000);
     })();
     </script>
-  <div id="appVerBadge" style="position:fixed;right:6px;bottom:4px;font-size:11px;line-height:1;opacity:.55;z-index:2147483000;pointer-events:none;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);font-family:system-ui,sans-serif"></div>
-<!-- 🏷 改版簡歷(VT2 2026-09-16 補齊 game-must-haves ⑦ 的下半件)。
-     徽章只回答「我開到哪一版」,這一份回答「每一版做了什麼」——寫給家長與老師看。
-     ★ 徽章維持 pointer-events:none(標籤不是按鈕);簡歷從選單那顆鈕開。
-     ★ 改版時在 APP_VERSIONS 最前面插一筆就好。 -->
+<!-- 🏷 更新紀錄(v31 起;v32 由「改版簡歷」改名)。回答「每一版做了什麼」——寫給弟兄姊妹看。
+     ★ 版號唯一來源＝APP_VERSIONS 第一筆:頁尾那一列(App.jsx footer)讀 window.__appVersion。
+       v32 拿掉右下角 10 秒淡出的徽章,畫面上只剩頁尾一處版號。
+     ★ 改版時在 APP_VERSIONS 最前面插一筆,並同步 public/sw.js 的 CACHE_NAME(npm test 會擋對不上)。 -->
 <style>#appVerSheet[hidden]{display:none!important}</style>
 <div id="appVerSheet" hidden style="position:fixed;inset:0;z-index:2147483001;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,'Noto Sans TC',sans-serif">
   <div style="max-width:460px;width:100%;max-height:72vh;overflow-y:auto;background:var(--card, #fffdf8);border:1px solid var(--border, #d9cfc0);border-radius:12px;padding:16px 18px;color:var(--text, #2c2419);box-shadow:0 18px 50px rgba(0,0,0,.45)">
-    <h3 style="margin:0 0 4px;font-size:16px">🏷️ 改版簡歷</h3>
-    <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:var(--text2, #6b5d4d)">每一版新增了什麼,白話寫給家長與老師看。前幾版都列在下面,最新的在最上面。</p>
-    <ol id="appVerList" style="margin:0;padding-left:18px;font-size:13px;line-height:1.85"></ol>
-    <button type="button" id="appVerClose" style="margin-top:14px;width:100%;min-height:44px;font:inherit;color:var(--text, #2c2419);background:var(--tag-bg, #f0e8d8);border:1px solid var(--border, #d9cfc0);border-radius:8px;cursor:pointer">關閉</button>
+    <h3 style="margin:0 0 6px;font-size:21px">🏷️ 更新紀錄</h3>
+    <p style="margin:0 0 12px;font-size:18px;line-height:1.6;color:var(--text, #2c2419)">每一版新增了什麼,白話寫給弟兄姊妹看。最新的在最上面。</p>
+    <ol id="appVerList" style="margin:0;padding-left:22px;font-size:18px;line-height:1.75"></ol>
+    <button type="button" id="appVerClose" style="margin-top:14px;width:100%;min-height:48px;font:inherit;font-size:18px;font-weight:700;color:var(--text, #2c2419);background:var(--tag-bg, #f0e8d8);border:1px solid var(--border, #d9cfc0);border-radius:8px;cursor:pointer">關閉</button>
   </div>
 </div>
 <script>
@@ -94,9 +93,14 @@
   // 最新的放最前面。改版只要在這裡插一筆。
   var APP_VERSIONS = [
     {
+      "v": "v32",
+      "d": "2026-11-13",
+      "t": "經文預設的字變大了(自己調過字級的人維持原本的大小)。頁面最下面常駐「版本 · 更新紀錄」,點一下就看得到每一版改了什麼;第一次來會有一張說明卡,教你怎麼查一節、找詞、把字放大,想再看就按頁面最下面的「使用說明」。按鈕和分頁也變大比較好按;匯入備份前會先提醒「同一個檔匯入兩次,讀經次數會重複計算」。"
+    },
+    {
       "v": "v31",
       "d": "2026-09-16",
-      "t": "頁尾多一顆「🏷️ 改版簡歷」鈕,點開就看得到每一版做了什麼。以前畫面右下角只看得到版本號,卻看不到那一版改了什麼。"
+      "t": "頁尾多一顆「改版簡歷」鈕(現在叫「更新紀錄」),點開就看得到每一版做了什麼。以前畫面右下角只看得到版本號,卻看不到那一版改了什麼。"
     },
     {
       "v": "v30",
@@ -116,12 +120,12 @@
     {
       "v": "v25 到 v26",
       "d": "2026-08-12",
-      "t": "站內就有大字註釋面板:註釋直接在頁面裡展開,原文編號可以就地看中文字義(希臘文/希伯來文與文法),字典裡的參照點了會跳過去,字級跟著閱讀字級走。另外多了回頂鈕(捲一個半螢幕以上才出現),手機上經文也再貼邊一次——每一行大約多放六個中文字。"
+      "t": "站內就有大字註釋面板:註釋直接在頁面裡展開,原文編號可以就地看中文字義(希臘文/希伯來文與文法),字典裡的參照點了會跳過去,字級跟著閱讀字級走。另外多了回頂鈕(往下捲一段才出現),手機上經文也再貼近螢幕邊,每一行能多放幾個字。"
     },
     {
       "v": "v23 到 v24",
       "d": "2026-08-10",
-      "t": "新增「原文」鈕:每一節都可以打開來看帶編號的和合本,點一個詞就看到它的中文字義與文法;手機上的搜尋結果卡改成滿版,每一行從約 19 個中文字變成約 23 個。"
+      "t": "新增「原文」鈕:每一節都可以打開來看帶編號的和合本,點一個詞就看到它的中文字義與文法;手機上的搜尋結果卡改成滿版,每一行能放更多字。"
     },
     {
       "v": "v21 到 v22",
@@ -170,45 +174,6 @@
   closeBtn.addEventListener('click', shutSheet);
   sheet.addEventListener('click', function (e) { if (e.target === sheet) shutSheet(); });
   addEventListener('keydown', function (e) { if (e.key === 'Escape' && !sheet.hidden) shutSheet(); });
-})();
-</script>
-    <script>
-      /* 🏷️ appVerBadgeFade（0828）：版號徽章是 position:fixed 在右下角，實測會蓋住大廳卡片、
-         遊戲的「難度 / 開始比賽」按鈕——pointer-events:none 只讓「點擊」穿過去，字還是被蓋著。
-         做法：10 秒後淡出。要看版本就重新整理，平常不擋畫面。 */
-      ;(function () {
-        var b = document.getElementById('appVerBadge')
-        if (!b) return
-        b.style.transition = 'opacity .8s'
-        setTimeout(function () {
-          b.style.opacity = '0'
-          setTimeout(function () { b.style.display = 'none' }, 900)
-        }, 10000)
-      })()
-    </script>
-<script>
-/* 🏷️ 版號徽章(0820 全艦隊批次):問「正在控制本頁的 SW」拿版本=你手上真的在跑的那一版,
-   頁面不寫死任何版號(不會漂)。硬重整(Ctrl+F5)的分頁不受 SW 管、問不到 → 誠實顯示退路
-   (股票管家 v134 同款);SW 換版接管時會再問,自動換新。 */
-(function () {
-  var el = document.getElementById('appVerBadge');
-  if (!el || !('serviceWorker' in navigator) || location.protocol !== 'https:') return;
-  var got = false;
-  navigator.serviceWorker.addEventListener('message', function (e) {
-    if (e.data && e.data.type === 'SW_VERSION') {
-      got = true;
-      var s = String(e.data.v), m = /-((?:v|nf)?\d+)$/.exec(s);
-      el.textContent = '🏷️ 版本 ' + (m ? m[1] : s) + '(這台裝置實際執行中的版本)';
-    }
-  });
-  function ask() { var c = navigator.serviceWorker.controller; if (c) c.postMessage('GET_VERSION'); }
-  navigator.serviceWorker.ready.then(ask).catch(function () {});
-  navigator.serviceWorker.addEventListener('controllerchange', ask);
-  setTimeout(function () {
-    if (got) return;
-    if (!navigator.serviceWorker.controller) el.textContent = '🏷️ 版本 —(強制重新整理的分頁問不到;普通重整一次即顯示)';
-    else { ask(); setTimeout(function () { if (!got) el.textContent = '🏷️ 版本 —(讀不到,重整一次即顯示)'; }, 1500); }
-  }, 1600);
 })();
 </script>
 </body>

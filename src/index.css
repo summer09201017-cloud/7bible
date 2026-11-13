@@ -302,3 +302,6 @@ input[type="checkbox"]:checked::after {
 
 /* 🧓 簡易模式(0809 B1):收起查經工具——串珠/註釋/複製格式/譯本排序箭頭(進階搜尋與差異高亮在 JSX 條件渲染) */
 .simple-mode .adv-tool { display: none !important; }
+
+/* v32:下拉選單原本 outline:none 把鍵盤焦點框拿掉了 ⇒ 補一個看得見的 */
+select:focus-visible { outline: 3px solid var(--link-text, #1565c0); outline-offset: 2px; }

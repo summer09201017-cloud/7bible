@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bible-app-v31';   /* v29(0814):+和修本(rcuv)線上譯本(qb.php 逐章即時查;abv.php 標 candownload=0 故不打包),段落標題貼該欄頂端、譯註收在「譯註 n」鈕,純淨經文進 bible_text ⇒ 複製/朗讀自動乾淨;全文搜尋不含線上譯本並明示;v28=註釋彈窗滿版 */
+const CACHE_NAME = 'bible-app-v32';   /* v32(1113):頁尾常駐版本列＋更新紀錄、第一次來說明卡、經文預設 19、按鈕放大(版號要等於 index.html APP_VERSIONS 第一筆,npm test 擋);v29(0814):+和修本(rcuv)線上譯本(qb.php 逐章即時查;abv.php 標 candownload=0 故不打包),段落標題貼該欄頂端、譯註收在「譯註 n」鈕,純淨經文進 bible_text ⇒ 複製/朗讀自動乾淨;全文搜尋不含線上譯本並明示;v28=註釋彈窗滿版 */
 
 const STATIC_ASSETS = [
   '/',
